@@ -4,7 +4,6 @@ plugins {
     alias(libs.plugins.compose.compiler)
 }
 
-
 android {
     namespace = "com.learning.multipet"
     compileSdk = 35
@@ -17,11 +16,7 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-        isCoreLibraryDesugaringEnabled = true
-    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -47,24 +42,27 @@ android {
     }
 }
 
-
 dependencies {
-    // Core
+    // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+    // Maps
     implementation("com.google.maps.android:maps-compose:4.3.0")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.maps.android:maps-compose:latest-version")
+    implementation("com.google.android.gms:play-services-location:latest-version")
     implementation("com.google.android.gms:play-services-location:21.0.1")
-    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.compose.ui.text)
     androidTestImplementation(platform(libs.androidx.compose.bom))
 
     // Compose
@@ -72,22 +70,21 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3")
+    implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.ui:ui-text")
 
-
-
-
-    // Lifecycle (Compose)
+    // Lifecycle
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
+
+    // Image loading
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     // Debug
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
-    implementation("io.coil-kt:coil-compose:2.7.0")
-    implementation("io.coil-kt:coil-compose:2.6.0")
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
     // Tests
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

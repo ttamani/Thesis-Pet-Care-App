@@ -69,11 +69,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.learning.multipet.data.Pet
@@ -110,42 +110,54 @@ fun ManagePetsScreen(vm: AppViewModel) {
             containerColor = colors.background,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
         ) { padding ->
-            if (state.pets.isEmpty()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    EmptyPetsState(
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                if (state.pets.isEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        EmptyPetsState(
+                            onAddPet = {
+                                editing = null
+                                editorOpen = true
+                            }
+                        )
+                    }
+                } else {
+                    ManagePetsHeader(
+                        petCount = state.pets.size,
                         onAddPet = {
                             editing = null
                             editorOpen = true
                         }
                     )
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    items(state.pets, key = { it.id }) { pet ->
-                        PetGridTile(
-                            pet = pet,
-                            isSelected = pet.id == state.selectedPetId,
-                            onClick = { vm.selectPet(pet.id) },
-                            onEdit = {
-                                editing = pet
-                                editorOpen = true
-                            },
-                            onDelete = { vm.deletePet(pet.id) }
-                        )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        items(state.pets, key = { it.id }) { pet ->
+                            PetGridTile(
+                                pet = pet,
+                                isSelected = pet.id == state.selectedPetId,
+                                onClick = { vm.selectPet(pet.id) },
+                                onEdit = {
+                                    editing = pet
+                                    editorOpen = true
+                                },
+                                onDelete = { vm.deletePet(pet.id) }
+                            )
+                        }
                     }
                 }
             }
@@ -180,6 +192,34 @@ fun ManagePetsScreen(vm: AppViewModel) {
     }
 }
 
+@Composable
+private fun ManagePetsHeader(
+    petCount: Int,
+    onAddPet: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+
+        }
+
+        Button(
+            onClick = onAddPet,
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = colors.primary,
+                contentColor = colors.onPrimary
+            )
+        ) {
+            Text("Add Pet")
+        }
+    }
+}
 @Composable
 private fun EmptyPetsState(
     onAddPet: () -> Unit

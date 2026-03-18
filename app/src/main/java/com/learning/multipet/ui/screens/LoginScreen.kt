@@ -1,10 +1,15 @@
 package com.learning.multipet.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -15,8 +20,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,13 +52,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -58,35 +66,24 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.learning.multipet.R
-
 
 private enum class AuthMode { Login, Register, OtpVerify }
 
 @Composable
 fun LoginScreen(
-    // Supabase ready callbacks (wire later)
     onLogin: (email: String, password: String, rememberMe: Boolean) -> Unit = { _, _, _ -> },
     onRegister: (email: String, password: String) -> Unit = { _, _ -> },
     onVerifyOtp: (email: String, otp4: String) -> Unit = { _, _ -> },
     onResendOtp: (email: String) -> Unit = { _ -> },
     onGoogleSignIn: () -> Unit = {},
-    // kapag okay lahat
     onAuthSuccess: () -> Unit
 ) {
     var mode by remember { mutableStateOf(AuthMode.Login) }
-
-    // share email across register -> otp
     var sharedEmail by remember { mutableStateOf("") }
 
     Box(modifier = Modifier.fillMaxSize()) {
-
-        Image(
-            painter = painterResource(id = R.drawable.login_bg),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
+        AnimatedLoginBackground()
+        FloatingOrbs()
 
         Box(
             modifier = Modifier
@@ -94,8 +91,9 @@ fun LoginScreen(
                 .background(
                     Brush.verticalGradient(
                         listOf(
-                            Color(0xFF0B1220).copy(alpha = 0.78f),
-                            Color(0xFF0B1220).copy(alpha = 0.55f)
+                            Color(0xFF08111F).copy(alpha = 0.52f),
+                            Color(0xFF08111F).copy(alpha = 0.28f),
+                            Color(0xFF08111F).copy(alpha = 0.58f)
                         )
                     )
                 )
@@ -111,9 +109,9 @@ fun LoginScreen(
                 .padding(20.dp)
                 .fillMaxWidth()
                 .border(
-                    1.dp,
-                    Color.White.copy(alpha = 0.16f),
-                    RoundedCornerShape(28.dp)
+                    width = 1.dp,
+                    color = Color.White.copy(alpha = 0.16f),
+                    shape = RoundedCornerShape(28.dp)
                 )
         ) {
             Column(
@@ -121,37 +119,35 @@ fun LoginScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(
-                    when (mode) {
-                        AuthMode.Login -> "Welcome!"
+                    text = when (mode) {
+                        AuthMode.Login -> "Welcome back"
                         AuthMode.Register -> "Create your account"
                         AuthMode.OtpVerify -> "Verify your email"
                     },
-                    color = Color.White.copy(alpha = 0.92f),
+                    color = Color.White.copy(alpha = 0.96f),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold
                 )
 
                 Text(
-                    when (mode) {
-                        AuthMode.Login -> "Login to continue"
-                        AuthMode.Register -> "Register with your email"
+                    text = when (mode) {
+                        AuthMode.Login -> "Login to continue to MultiPet Care"
+                        AuthMode.Register -> "Register with your email to get started"
                         AuthMode.OtpVerify -> "Enter the 4-digit code sent to your email"
                     },
-                    color = Color.White.copy(alpha = 0.70f),
+                    color = Color.White.copy(alpha = 0.74f),
                     style = MaterialTheme.typography.bodyMedium
                 )
 
                 AnimatedContent(
                     targetState = mode,
                     transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = ""
+                    label = "auth_mode"
                 ) { m ->
                     when (m) {
                         AuthMode.Login -> LoginForm(
                             onLogin = { email, pass, rememberMe ->
                                 onLogin(email, pass, rememberMe)
-                                // pansamantagal
-                                // onAuthSuccess()
                             },
                             onGoogleSignIn = onGoogleSignIn,
                             onGoRegister = { mode = AuthMode.Register }
@@ -161,7 +157,6 @@ fun LoginScreen(
                             onCreateAccount = { email, pass ->
                                 sharedEmail = email
                                 onRegister(email, pass)
-                                // after calling Supabase signUp (email OTP), go to OTP screen:
                                 mode = AuthMode.OtpVerify
                             },
                             onGoogleSignIn = onGoogleSignIn,
@@ -172,8 +167,6 @@ fun LoginScreen(
                             email = sharedEmail,
                             onVerify = { otp ->
                                 onVerifyOtp(sharedEmail, otp)
-                                // if verify success:
-                                // onAuthSuccess()
                             },
                             onResend = { onResendOtp(sharedEmail) },
                             onChangeEmail = {
@@ -190,6 +183,133 @@ fun LoginScreen(
 }
 
 @Composable
+private fun AnimatedLoginBackground() {
+    val transition = rememberInfiniteTransition(label = "login_bg")
+
+    val shift by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1400f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 12000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "gradient_shift"
+    )
+
+    val colors = listOf(
+        Color(0xFF07111F),
+        Color(0xFF10233B),
+        Color(0xFF173C5A),
+        Color(0xFF2A6C7E),
+        Color(0xFF07111F)
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    colors = colors,
+                    start = Offset(shift, 0f),
+                    end = Offset(shift + 1200f, 1800f)
+                )
+            )
+    )
+}
+
+@Composable
+private fun FloatingOrbs() {
+    val transition = rememberInfiniteTransition(label = "orbs")
+
+    val x1 by transition.animateFloat(
+        initialValue = -40f,
+        targetValue = 60f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(8000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb1x"
+    )
+
+    val y1 by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 90f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(10000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb1y"
+    )
+
+    val x2 by transition.animateFloat(
+        initialValue = 30f,
+        targetValue = -80f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(11000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb2x"
+    )
+
+    val y2 by transition.animateFloat(
+        initialValue = 20f,
+        targetValue = -60f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(9000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb2y"
+    )
+
+    val x3 by transition.animateFloat(
+        initialValue = -20f,
+        targetValue = 70f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(13000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "orb3x"
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .offset(x = x1.dp, y = y1.dp)
+                .size(220.dp)
+                .blur(48.dp)
+                .background(
+                    color = Color(0xFF18B6A4).copy(alpha = 0.22f),
+                    shape = CircleShape
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = x2.dp, y = y2.dp)
+                .size(260.dp)
+                .blur(56.dp)
+                .background(
+                    color = Color(0xFF4B7BFF).copy(alpha = 0.18f),
+                    shape = CircleShape
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .offset(x = x3.dp, y = (-24).dp)
+                .size(240.dp)
+                .blur(54.dp)
+                .background(
+                    color = Color(0xFF9B5CFF).copy(alpha = 0.16f),
+                    shape = CircleShape
+                )
+        )
+    }
+}
+
+@Composable
 private fun LoginForm(
     onLogin: (String, String, Boolean) -> Unit,
     onGoogleSignIn: () -> Unit,
@@ -201,7 +321,6 @@ private fun LoginForm(
     var showPassword by remember { mutableStateOf(false) }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
         AuthTextField(
             value = email,
             onValueChange = { email = it },
@@ -228,13 +347,13 @@ private fun LoginForm(
                 onCheckedChange = { rememberMe = it },
                 colors = CheckboxDefaults.colors(
                     checkedColor = Color(0xFF14B8A6),
-                    uncheckedColor = Color.White.copy(alpha = 0.7f),
+                    uncheckedColor = Color.White.copy(alpha = 0.70f),
                     checkmarkColor = Color.Black
                 )
             )
             Text("Remember me", color = Color.White.copy(alpha = 0.90f))
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = { /* later: forgot password */ }) {
+            TextButton(onClick = { }) {
                 Text("Forgot?", color = Color.White)
             }
         }
@@ -277,7 +396,6 @@ private fun RegisterForm(
     val canRegister = email.isNotBlank() && password.isNotBlank() && password == confirm
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
         AuthTextField(
             value = email,
             onValueChange = { email = it },
@@ -348,7 +466,6 @@ private fun OtpVerifyForm(
     val canVerify = otp.length == 4 && otp.all { it.isDigit() }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
         Text(
             text = "Code sent to:",
             color = Color.White.copy(alpha = 0.75f),
@@ -430,17 +547,7 @@ private fun OtpBox(
             .width(56.dp)
             .height(56.dp),
         shape = RoundedCornerShape(14.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Color(0xFF14B8A6),
-            unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
-            focusedLabelColor = Color.White,
-            unfocusedLabelColor = Color.White.copy(alpha = 0.75f),
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            cursorColor = Color(0xFF14B8A6),
-            focusedContainerColor = Color.White.copy(alpha = 0.08f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.06f)
-        )
+        colors = authFieldColors()
     )
 }
 
@@ -474,17 +581,7 @@ private fun AuthTextField(
         },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Color(0xFF14B8A6),
-            unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
-            focusedLabelColor = Color.White,
-            unfocusedLabelColor = Color.White.copy(alpha = 0.75f),
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
-            cursorColor = Color(0xFF14B8A6),
-            focusedContainerColor = Color.White.copy(alpha = 0.08f),
-            unfocusedContainerColor = Color.White.copy(alpha = 0.06f)
-        )
+        colors = authFieldColors()
     )
 }
 
@@ -494,8 +591,29 @@ private fun GoogleButton(onClick: () -> Unit) {
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
+        border = ButtonDefaults.outlinedButtonBorder.copy(
+            brush = Brush.linearGradient(
+                listOf(
+                    Color.White.copy(alpha = 0.24f),
+                    Color.White.copy(alpha = 0.12f)
+                )
+            )
+        ),
         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White)
     ) {
         Text("Continue with Google", fontWeight = FontWeight.SemiBold)
     }
 }
+
+@Composable
+private fun authFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = Color(0xFF14B8A6),
+    unfocusedBorderColor = Color.White.copy(alpha = 0.25f),
+    focusedLabelColor = Color.White,
+    unfocusedLabelColor = Color.White.copy(alpha = 0.75f),
+    focusedTextColor = Color.White,
+    unfocusedTextColor = Color.White,
+    cursorColor = Color(0xFF14B8A6),
+    focusedContainerColor = Color.White.copy(alpha = 0.08f),
+    unfocusedContainerColor = Color.White.copy(alpha = 0.06f)
+)
