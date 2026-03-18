@@ -50,7 +50,6 @@ import com.learning.multipet.viewmodel.AppViewModel
 import java.time.LocalDate
 import java.time.YearMonth
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun RecordsScreen(
     vm: AppViewModel,
@@ -236,7 +235,6 @@ fun RecordsScreen(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 private fun MonthHeaderModern(
     month: YearMonth,
@@ -268,7 +266,7 @@ private fun MonthHeaderModern(
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
+
 @Composable
 private fun ModernCalendar(
     month: YearMonth,
@@ -381,3 +379,6 @@ private fun NiceEmptyCard(
         }
     }
 }
+
+
+

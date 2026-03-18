@@ -1,6 +1,9 @@
 package com.learning.multipet.ui.screens
 
-import coil.compose.rememberAsyncImagePainter
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -49,7 +53,6 @@ import com.learning.multipet.data.Pet
 import com.learning.multipet.ui.AppColors
 import com.learning.multipet.viewmodel.AppViewModel
 
-// Optional: use this if you want to route quick logs later
 enum class LogType { Appetite, Stool, Energy, Weight, VaccineDeworm }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,18 +61,39 @@ fun HomeScreen(
     vm: AppViewModel,
     onGoManage: () -> Unit
 ) {
+
     val state by vm.state.collectAsState()
 
-    // ✅ For popup sheet
+    // popup sheet
     var sheetPet by remember { mutableStateOf<Pet?>(null) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var permissionsAsked by remember { mutableStateOf(false) }
 
+    val locationLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) {}
+
+    val photosPermission = if (Build.VERSION.SDK_INT >= 33)
+        Manifest.permission.READ_MEDIA_IMAGES
+    else
+        Manifest.permission.READ_EXTERNAL_STORAGE
+
+    val photosLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) {}
+    LaunchedEffect(Unit) {
+        if (!permissionsAsked) {
+            locationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+            photosLauncher.launch(photosPermission)
+            permissionsAsked = true
+        }
+    }
     Column(
         Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Heads Up / AI summary card
+        // Heads Up
         Card(colors = CardDefaults.cardColors(containerColor = AppColors.Teal)) {
             Column(Modifier.padding(16.dp)) {
                 Text(
@@ -131,11 +155,10 @@ fun HomeScreen(
 
         Spacer(Modifier.height(14.dp))
 
-        // ✅ Home stays clean; no more big summary here
-        // You can put other home widgets here later (reminders, insights, etc.)
+
     }
 
-    // ✅ Pop-up sheet: profile + quick logs
+    // profile + quick logs
     if (sheetPet != null) {
         ModalBottomSheet(
             onDismissRequest = { sheetPet = null },

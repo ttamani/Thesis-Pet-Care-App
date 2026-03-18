@@ -1,10 +1,8 @@
 package com.learning.multipet
 
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Pets
@@ -42,18 +41,22 @@ import com.learning.multipet.ui.AppColors
 import com.learning.multipet.ui.AppTheme
 import com.learning.multipet.ui.screens.AiChatSheet
 import com.learning.multipet.ui.screens.HomeScreen
+import com.learning.multipet.ui.screens.LoginScreen
 import com.learning.multipet.ui.screens.ManagePetsScreen
 import com.learning.multipet.ui.screens.RecordsScreen
+import com.learning.multipet.ui.screens.VetMapScreen
 import com.learning.multipet.viewmodel.AppViewModel
+
 
 enum class BottomTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
     Home("Home", Icons.Filled.Home),
     Records("Records", Icons.Filled.DateRange),
-    Manage("Manage", Icons.Filled.Pets)
+    Manage("Manage", Icons.Filled.Pets),
+
+    Map("Map", Icons.Filled.LocationOn)
 }
 
 class MainActivity : ComponentActivity() {
-    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -62,10 +65,17 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppRoot(vm: AppViewModel = viewModel()) {
+    var isLoggedIn by remember { mutableStateOf(false) }
+
+    if (!isLoggedIn) {
+        LoginScreen(
+            onLoginSuccess = { isLoggedIn = true }
+        )
+        return
+    }
     var tab by remember { mutableStateOf(BottomTab.Home) }
     var showChat by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -94,6 +104,7 @@ fun AppRoot(vm: AppViewModel = viewModel()) {
                 BottomTab.Home -> HomeScreen(vm = vm, onGoManage = { tab = BottomTab.Manage })
                 BottomTab.Records -> RecordsScreen(vm = vm, onGoManage = { tab = BottomTab.Manage })
                 BottomTab.Manage -> ManagePetsScreen(vm = vm)
+                BottomTab.Map -> VetMapScreen()
             }
         }
     }

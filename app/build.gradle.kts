@@ -55,6 +55,10 @@ dependencies {
     implementation(libs.material)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    implementation("com.google.maps.android:maps-compose:4.3.0")
+    implementation("com.google.android.gms:play-services-maps:18.2.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
