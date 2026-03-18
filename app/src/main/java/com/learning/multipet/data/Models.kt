@@ -5,17 +5,19 @@ import java.util.UUID
 
 enum class Species { DOG, CAT }
 
+
 data class Pet(
-    val id: String = UUID.randomUUID().toString(),
+    val id: String = java.util.UUID.randomUUID().toString(),
     val species: Species = Species.DOG,
     val name: String = "",
     val breed: String = "",
-    val sex: String = "Unknown", // Male/Female/Unknown
+    val sex: String = "Unknown",
     val ageYears: Int = 1,
-    val weightKg: Double = 1.0,
+    val weightKg: Double? = null,
     val vaccinated: Boolean = false,
-    val lastDewormDate: LocalDate? = null
+    val imageUri: String? = null
 )
+
 
 enum class LogType {
     APPETITE, STOOL, ENERGY, WEIGHT, VACCINE, DEWORM, NOTES

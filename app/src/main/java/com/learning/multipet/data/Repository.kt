@@ -63,4 +63,21 @@ class Repository {
         val s = _state.value
         return s.logs.filter { it.date == date && (petId == null || it.petId == petId) }
     }
+    fun upsertPet(pet: Pet) {
+        _state.update { s ->
+            val exists = s.pets.any { it.id == pet.id }
+            val newPets = if (exists) {
+                s.pets.map { if (it.id == pet.id) pet else it }
+            } else {
+                s.pets + pet
+            }
+
+            s.copy(
+                pets = newPets,
+                selectedPetId = pet.id,
+                lastActivePetId = pet.id
+            )
+        }
+    }
+
 }

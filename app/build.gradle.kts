@@ -39,6 +39,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -53,9 +54,13 @@ dependencies {
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.ui.text)
     androidTestImplementation(platform(libs.androidx.compose.bom))
 
     // Compose
@@ -65,6 +70,7 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+
 
 
 

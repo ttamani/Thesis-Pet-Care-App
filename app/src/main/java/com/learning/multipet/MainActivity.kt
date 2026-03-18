@@ -1,8 +1,10 @@
 package com.learning.multipet
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -51,6 +53,7 @@ enum class BottomTab(val label: String, val icon: androidx.compose.ui.graphics.v
 }
 
 class MainActivity : ComponentActivity() {
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
@@ -59,6 +62,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppRoot(vm: AppViewModel = viewModel()) {
@@ -104,6 +108,7 @@ fun AppRoot(vm: AppViewModel = viewModel()) {
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

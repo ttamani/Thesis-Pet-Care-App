@@ -35,4 +35,7 @@ class AppViewModel(
         val id = s.lastActivePetId ?: s.selectedPetId ?: pets.first().id
         return pets.find { it.id == id } ?: pets.first()
     }
+
+    // Optional convenience
+    fun upsertPet(pet: Pet) = repo.upsertPet(pet)
 }
