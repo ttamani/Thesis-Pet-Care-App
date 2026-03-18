@@ -24,18 +24,18 @@ class AppViewModel(
         repo.addLog(LogEntry(petId = petId, date = date, type = type, note = note))
     }
 
-    // AI context: NO forced selection
+    // aayusin pa
     fun resolvedPetForAI(): Pet? {
         val s = state.value
         val pets = s.pets
         if (pets.isEmpty()) return null
         if (pets.size == 1) return pets.first()
 
-        // Priority: lastActive -> selected -> first
+        // Unang makita sa screen sa pet  homescreen lastActive -> selected -> first
         val id = s.lastActivePetId ?: s.selectedPetId ?: pets.first().id
         return pets.find { it.id == id } ?: pets.first()
     }
 
-    // Optional convenience
+
     fun upsertPet(pet: Pet) = repo.upsertPet(pet)
 }

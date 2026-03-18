@@ -242,7 +242,7 @@ private fun PetProfileSheet(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
 
-            // ✅ large avatar
+            //avatar
             Surface(
                 modifier = Modifier.size(64.dp),
                 shape = CircleShape,
@@ -276,7 +276,6 @@ private fun PetProfileSheet(
 
         Spacer(Modifier.height(12.dp))
 
-        // ... keep the rest of your chips + quick logs
     }
 }
 @Composable
