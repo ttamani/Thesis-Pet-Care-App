@@ -3,66 +3,124 @@ package com.learning.multipet
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.NotificationsNone
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Pets
-import androidx.compose.material.icons.filled.SmartToy
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.learning.multipet.ui.AppColors
 import com.learning.multipet.ui.AppTheme
-import com.learning.multipet.ui.screens.AiChatSheet
+import com.learning.multipet.ui.ThemePreference
+import com.learning.multipet.ui.ThemeViewModel
+import com.learning.multipet.ui.screens.AiChatScreen
+import com.learning.multipet.ui.screens.CalendarScreen
 import com.learning.multipet.ui.screens.HomeScreen
 import com.learning.multipet.ui.screens.LoginScreen
 import com.learning.multipet.ui.screens.ManagePetsScreen
-import com.learning.multipet.ui.screens.RecordsScreen
 import com.learning.multipet.ui.screens.VetMapScreen
 import com.learning.multipet.viewmodel.AppViewModel
 import com.learning.multipet.viewmodel.SessionViewModel
 
+enum class BottomTab(
+    val label: String,
+    val icon: ImageVector,
+    val title: String,
+    val subtitle: String
+) {
+    Home(
+        label = "Home",
+        icon = Icons.Filled.Home,
+        title = "Home",
+        subtitle = "Pet care at a glance"
+    ),
+    Records(
+        label = "Records",
+        icon = Icons.Filled.DateRange,
+        title = "Records",
+        subtitle = "View logs and care history"
+    ),
+    Pets(
+        label = "Pets",
+        icon = Icons.Filled.Pets,
+        title = "Pets",
+        subtitle = "Manage pet profiles"
+    ),
+    Vets(
+        label = "Vets",
+        icon = Icons.Filled.LocationOn,
+        title = "Vets",
+        subtitle = "Find nearby clinics"
+    )
+}
 
-enum class BottomTab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    Home("Home", Icons.Filled.Home),
-    Records("Records", Icons.Filled.DateRange),
-    Manage("Manage", Icons.Filled.Pets),
-
-    Map("Map", Icons.Filled.LocationOn)
+private enum class DashboardRoute {
+    Main,
+    Profile,
+    Ai
 }
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            AppTheme { AppRoot() }
+            AppRoot()
         }
     }
 }
@@ -70,92 +128,858 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AppRoot(
     vm: AppViewModel = viewModel(),
-    sessionVm: SessionViewModel = viewModel()
-){
+    sessionVm: SessionViewModel = viewModel(),
+    themeVm: ThemeViewModel = viewModel()
+) {
     val isLoggedIn = sessionVm.isLoggedIn.collectAsState().value
+    val themePreference = themeVm.themePreference.collectAsState().value
 
-    if (!isLoggedIn) {
-        LoginScreen(
-            onLogin = { email, pass, rememberMe ->
-                sessionVm.saveSession("""{"mock":"session"}""")
-            },
-            onRegister = { email, pass -> },
-            onVerifyOtp = { email, otp4 ->
-                sessionVm.saveSession("""{"mock":"session"}""")
-            },
-            onGoogleSignIn = { },
-            onAuthSuccess = { sessionVm.saveSession("""{"mock":"session"}""") }
+    AppTheme(themePreference = themePreference) {
+        if (!isLoggedIn) {
+            LoginScreen(
+                onLogin = { _, _, _ ->
+                    sessionVm.saveSession("""{"mock":"session"}""")
+                },
+                onRegister = { _, _ -> },
+                onVerifyOtp = { _, _ ->
+                    sessionVm.saveSession("""{"mock":"session"}""")
+                },
+                onGoogleSignIn = { },
+                onAuthSuccess = {
+                    sessionVm.saveSession("""{"mock":"session"}""")
+                }
+            )
+            return@AppTheme
+        }
+
+        DashboardScaffold(
+            vm = vm,
+            sessionVm = sessionVm,
+            themeVm = themeVm
         )
-        return
     }
-
-    //dashboard scaffold
-    DashboardScaffold(vm = vm)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppTopBar() {
-    TopAppBar(
-        title = { Text("MultiPetCare") },
-        actions = {
-            IconButton(onClick = { }) { Icon(Icons.Default.NotificationsNone, null) }
-            IconButton(onClick = { }) { Icon(Icons.Default.Person, null) }
+private fun DashboardScaffold(
+    vm: AppViewModel,
+    sessionVm: SessionViewModel,
+    themeVm: ThemeViewModel
+) {
+    val state by vm.state.collectAsState()
+    val currentTheme = themeVm.themePreference.collectAsState().value
+    val colors = MaterialTheme.colorScheme
+
+    var tab by rememberSaveable { mutableStateOf(BottomTab.Home) }
+    var route by rememberSaveable { mutableStateOf(DashboardRoute.Main) }
+    var showNotifications by remember { mutableStateOf(false) }
+
+    var profileName by rememberSaveable { mutableStateOf("Pet Owner") }
+    var accountEmail by rememberSaveable { mutableStateOf("signedin@example.com") }
+
+    var notificationsEnabled by rememberSaveable { mutableStateOf(true) }
+    var remindersEnabled by rememberSaveable { mutableStateOf(true) }
+    var aiSuggestionsEnabled by rememberSaveable { mutableStateOf(true) }
+
+    val vaccinesDue = state.pets.count { !it.vaccinated }
+    val attentionCount = vaccinesDue
+
+    when (route) {
+        DashboardRoute.Profile -> {
+            ProfileScreen(
+                currentName = profileName,
+                currentEmail = accountEmail,
+                currentTheme = currentTheme,
+                notificationsEnabled = notificationsEnabled,
+                remindersEnabled = remindersEnabled,
+                aiSuggestionsEnabled = aiSuggestionsEnabled,
+                onBack = { route = DashboardRoute.Main },
+                onSaveName = { profileName = it },
+                onThemeChange = { themeVm.setThemePreference(it) },
+                onNotificationsChange = { notificationsEnabled = it },
+                onRemindersChange = { remindersEnabled = it },
+                onAiSuggestionsChange = { aiSuggestionsEnabled = it },
+                onSignOut = {
+                    route = DashboardRoute.Main
+                    sessionVm.logout()
+                }
+            )
         }
-    )
+
+        DashboardRoute.Ai -> {
+            AiChatScreen(
+                vm = vm,
+                onBack = { route = DashboardRoute.Main }
+            )
+        }
+
+        DashboardRoute.Main -> {
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(colors.background),
+                containerColor = colors.background,
+                topBar = {
+                    AppTopBar(
+                        title = tab.title,
+                        subtitle = tab.subtitle,
+                        notificationCount = attentionCount,
+                        showNotifications = showNotifications,
+                        attentionCount = attentionCount,
+                        vaccinesDue = vaccinesDue,
+                        onNotificationsClick = {
+                            showNotifications = !showNotifications
+                        },
+                        onDismissNotifications = {
+                            showNotifications = false
+                        },
+                        onProfileClick = {
+                            showNotifications = false
+                            route = DashboardRoute.Profile
+                        }
+                    )
+                },
+                bottomBar = {
+                    AppBottomBar(
+                        selected = tab,
+                        onSelect = { tab = it }
+                    )
+                }
+            ) { padding ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                ) {
+                    when (tab) {
+                        BottomTab.Home -> HomeScreen(
+                            vm = vm,
+                            onGoManage = { tab = BottomTab.Pets },
+                            onOpenAi = {
+                                showNotifications = false
+                                route = DashboardRoute.Ai
+                            }
+                        )
+
+                        BottomTab.Records -> CalendarScreen(
+                            vm = vm,
+                            onGoManage = { tab = BottomTab.Pets }
+                        )
+
+                        BottomTab.Pets -> ManagePetsScreen(vm = vm)
+
+                        BottomTab.Vets -> VetMapScreen()
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
-private fun AppBottomBar(selected: BottomTab, onSelect: (BottomTab) -> Unit) {
-    NavigationBar {
-        BottomTab.entries.forEach { t ->
-            NavigationBarItem(
-                selected = t == selected,
-                onClick = { onSelect(t) },
-                icon = { Icon(t.icon, null) },
-                label = { Text(t.label) }
+private fun AppTopBar(
+    title: String,
+    subtitle: String,
+    notificationCount: Int,
+    showNotifications: Boolean,
+    attentionCount: Int,
+    vaccinesDue: Int,
+    onNotificationsClick: () -> Unit,
+    onDismissNotifications: () -> Unit,
+    onProfileClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(colors.background)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Top
+        ) {
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    color = colors.onBackground,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = subtitle,
+                    color = colors.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Top
+            ) {
+                Box {
+                    TopBarIconButton(
+                        icon = Icons.Filled.NotificationsNone,
+                        contentDescription = "Notifications",
+                        badgeCount = notificationCount,
+                        onClick = onNotificationsClick
+                    )
+
+                    NotificationPopup(
+                        expanded = showNotifications,
+                        attentionCount = attentionCount,
+                        vaccinesDue = vaccinesDue,
+                        onDismiss = onDismissNotifications
+                    )
+                }
+
+                TopBarIconButton(
+                    icon = Icons.Filled.Person,
+                    contentDescription = "Profile",
+                    onClick = onProfileClick
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopBarIconButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    badgeCount: Int = 0
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Surface(
+        onClick = onClick,
+        shape = CircleShape,
+        color = colors.surface,
+        border = BorderStroke(1.dp, colors.outline)
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (badgeCount > 0) {
+                BadgedBox(
+                    badge = {
+                        Badge(
+                            containerColor = colors.tertiary,
+                            contentColor = colors.onTertiary
+                        ) {
+                            Text(
+                                text = if (badgeCount > 9) "9+" else badgeCount.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = contentDescription,
+                        tint = colors.onSurface
+                    )
+                }
+            } else {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    tint = colors.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationPopup(
+    expanded: Boolean,
+    attentionCount: Int,
+    vaccinesDue: Int,
+    onDismiss: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(18.dp),
+        containerColor = colors.surface,
+        shadowElevation = 12.dp,
+        tonalElevation = 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .width(320.dp)
+                .padding(14.dp)
+        ) {
+            Text(
+                text = "Notifications",
+                color = colors.onSurface,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Reminders and updates for your pets.",
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (attentionCount == 0) {
+                Text(
+                    text = "No new notifications",
+                    color = colors.onSurface,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "You’re all caught up for now.",
+                    color = colors.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
+            } else {
+                NotificationPopupItem(
+                    title = "Care attention needed",
+                    message = "$attentionCount pet(s) currently need attention.",
+                    statusText = "Pending",
+                    statusColor = colors.tertiary,
+                    statusBackground = colors.tertiary.copy(alpha = 0.14f)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                NotificationPopupItem(
+                    title = "Vaccination reminder",
+                    message = "$vaccinesDue pet(s) may need a vaccine update.",
+                    statusText = "Pending",
+                    statusColor = colors.tertiary,
+                    statusBackground = colors.tertiary.copy(alpha = 0.14f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NotificationPopupItem(
+    title: String,
+    message: String,
+    statusText: String,
+    statusColor: Color,
+    statusBackground: Color
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = colors.surfaceVariant,
+        border = BorderStroke(1.dp, colors.outline)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = statusBackground
+                ) {
+                    Box(modifier = Modifier.size(10.dp))
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Text(
+                    text = title,
+                    color = colors.onSurface,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = message,
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = statusText,
+                color = statusColor,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium
             )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DashboardScaffold(vm: AppViewModel) {
-    var tab by remember { mutableStateOf(BottomTab.Home) }
-    var showChat by remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+private fun AppBottomBar(
+    selected: BottomTab,
+    onSelect: (BottomTab) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
 
-    Scaffold(
-        topBar = { AppTopBar() },
-        bottomBar = { AppBottomBar(selected = tab, onSelect = { tab = it }) },
-        floatingActionButton = {
-            FloatingActionButton(
-            onClick = { showChat = true },
-            shape = CircleShape,
-            containerColor = AppColors.Teal
+    Surface(
+        color = colors.surfaceVariant,
+        border = BorderStroke(1.dp, colors.outline)
+    ) {
+        NavigationBar(
+            modifier = Modifier.navigationBarsPadding(),
+            containerColor = Color.Transparent,
+            tonalElevation = 0.dp
         ) {
-            Icon(Icons.Filled.SmartToy, contentDescription = "AI Care", tint = Color.White)
-        } },
-        containerColor = AppColors.ScreenBg
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
-            when (tab) {
-                BottomTab.Home -> HomeScreen(vm = vm, onGoManage = { tab = BottomTab.Manage })
-                BottomTab.Records -> RecordsScreen(vm = vm, onGoManage = { tab = BottomTab.Manage })
-                BottomTab.Manage -> ManagePetsScreen(vm = vm) // MUST NOT be TODO()
-                BottomTab.Map -> VetMapScreen()
+            BottomTab.entries.forEach { tab ->
+                NavigationBarItem(
+                    selected = tab == selected,
+                    onClick = { onSelect(tab) },
+                    icon = {
+                        Icon(
+                            imageVector = tab.icon,
+                            contentDescription = tab.label
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = tab.label,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    },
+                    alwaysShowLabel = true,
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = colors.primary,
+                        selectedTextColor = colors.primary,
+                        unselectedIconColor = colors.onSurfaceVariant,
+                        unselectedTextColor = colors.onSurfaceVariant,
+                        indicatorColor = colors.primary.copy(alpha = 0.14f)
+                    )
+                )
             }
         }
     }
+}
 
-    if (showChat) {
-        ModalBottomSheet(
-            onDismissRequest = { showChat = false },
-            sheetState = sheetState
+@Composable
+private fun ProfileScreen(
+    currentName: String,
+    currentEmail: String,
+    currentTheme: ThemePreference,
+    notificationsEnabled: Boolean,
+    remindersEnabled: Boolean,
+    aiSuggestionsEnabled: Boolean,
+    onBack: () -> Unit,
+    onSaveName: (String) -> Unit,
+    onThemeChange: (ThemePreference) -> Unit,
+    onNotificationsChange: (Boolean) -> Unit,
+    onRemindersChange: (Boolean) -> Unit,
+    onAiSuggestionsChange: (Boolean) -> Unit,
+    onSignOut: () -> Unit
+) {
+    var editedName by remember(currentName) { mutableStateOf(currentName) }
+    val scrollState = rememberScrollState()
+    val colors = MaterialTheme.colorScheme
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = colors.background,
+        topBar = {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.background)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    onClick = onBack,
+                    shape = CircleShape,
+                    color = colors.surface,
+                    border = BorderStroke(1.dp, colors.outline)
+                ) {
+                    Box(
+                        modifier = Modifier.size(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            tint = colors.onSurface
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column {
+                    Text(
+                        text = "Profile Settings",
+                        color = colors.onBackground,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = "Manage your account and preferences",
+                        color = colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(scrollState)
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 20.dp)
         ) {
-            AiChatSheet(vm = vm)
-            Spacer(Modifier.height(12.dp))
+            Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = colors.surface,
+                border = BorderStroke(1.dp, colors.outline)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = colors.surfaceVariant,
+                        border = BorderStroke(1.dp, colors.outline)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(76.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Person,
+                                contentDescription = null,
+                                tint = colors.onSurface
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = editedName.ifBlank { "Pet Owner" },
+                        color = colors.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = currentEmail,
+                        color = colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = colors.surface,
+                border = BorderStroke(1.dp, colors.outline)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp)
+                ) {
+                    Text(
+                        text = "Account",
+                        color = colors.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    OutlinedTextField(
+                        value = editedName,
+                        onValueChange = { editedName = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Display Name") },
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    OutlinedTextField(
+                        value = currentEmail,
+                        onValueChange = {},
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Signed-in Account") },
+                        enabled = false,
+                        singleLine = true
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = colors.surface,
+                border = BorderStroke(1.dp, colors.outline)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp)
+                ) {
+                    Text(
+                        text = "Appearance",
+                        color = colors.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Choose how the app looks",
+                        color = colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        SegmentedButton(
+                            selected = currentTheme == ThemePreference.LIGHT,
+                            onClick = { onThemeChange(ThemePreference.LIGHT) },
+                            shape = SegmentedButtonDefaults.itemShape(0, 3)
+                        ) {
+                            Text("Light")
+                        }
+
+                        SegmentedButton(
+                            selected = currentTheme == ThemePreference.DARK,
+                            onClick = { onThemeChange(ThemePreference.DARK) },
+                            shape = SegmentedButtonDefaults.itemShape(1, 3)
+                        ) {
+                            Text("Dark")
+                        }
+
+                        SegmentedButton(
+                            selected = currentTheme == ThemePreference.SYSTEM,
+                            onClick = { onThemeChange(ThemePreference.SYSTEM) },
+                            shape = SegmentedButtonDefaults.itemShape(2, 3)
+                        ) {
+                            Text("System")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = when (currentTheme) {
+                            ThemePreference.LIGHT -> "Light mode is currently active."
+                            ThemePreference.DARK -> "Dark mode is currently active."
+                            ThemePreference.SYSTEM -> "The app follows your device appearance."
+                        },
+                        color = colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = colors.surface,
+                border = BorderStroke(1.dp, colors.outline)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp)
+                ) {
+                    Text(
+                        text = "Preferences",
+                        color = colors.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "Control how the app behaves",
+                        color = colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    PreferenceToggleRow(
+                        title = "Notifications",
+                        subtitle = "Receive reminders and updates",
+                        checked = notificationsEnabled,
+                        onCheckedChange = onNotificationsChange
+                    )
+
+                    PreferenceDivider()
+
+                    PreferenceToggleRow(
+                        title = "Reminder Alerts",
+                        subtitle = "Show pet-care and vaccine reminders",
+                        checked = remindersEnabled,
+                        onCheckedChange = onRemindersChange
+                    )
+
+                    PreferenceDivider()
+
+                    PreferenceToggleRow(
+                        title = "AI Quick Suggestions",
+                        subtitle = "Show suggested prompts in AI chat",
+                        checked = aiSuggestionsEnabled,
+                        onCheckedChange = onAiSuggestionsChange
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = colors.surface,
+                border = BorderStroke(1.dp, colors.outline)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp)
+                ) {
+                    Text(
+                        text = "Actions",
+                        color = colors.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Button(
+                        onClick = { onSaveName(editedName.trim().ifBlank { currentName }) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = colors.primary,
+                            contentColor = colors.onPrimary
+                        ),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Text("Save Changes")
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    HorizontalDivider(color = colors.outline)
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = onSignOut,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, colors.outline)
+                    ) {
+                        Text("Sign Out")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
         }
     }
+}
+
+@Composable
+private fun PreferenceToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+            Text(
+                text = title,
+                color = colors.onSurface,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = subtitle,
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = colors.primary,
+                uncheckedThumbColor = colors.onSurfaceVariant,
+                uncheckedTrackColor = colors.surfaceVariant,
+                uncheckedBorderColor = colors.outline
+            )
+        )
+    }
+}
+
+@Composable
+private fun PreferenceDivider() {
+    HorizontalDivider(
+        color = MaterialTheme.colorScheme.outline
+    )
 }

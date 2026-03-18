@@ -242,7 +242,6 @@ private fun LoginForm(
         Button(
             onClick = { onLogin(email.trim(), password, rememberMe) },
             modifier = Modifier.fillMaxWidth(),
-            enabled = email.isNotBlank() && password.isNotBlank(),
             colors = ButtonDefaults.buttonColors(
                 containerColor = Color(0xFF14B8A6),
                 contentColor = Color.Black
