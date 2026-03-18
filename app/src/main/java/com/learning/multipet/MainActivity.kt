@@ -89,7 +89,7 @@ fun AppRoot(
         return
     }
 
-    // ✅ Your dashboard scaffold here
+    //dashboard scaffold
     DashboardScaffold(vm = vm)
 }
 

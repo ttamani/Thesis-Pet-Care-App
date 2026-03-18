@@ -132,7 +132,7 @@ fun HomeScreen(
 
         Spacer(Modifier.height(10.dp))
 
-        // ✅ Grid view for pet cards
+        //Grid view pet cards
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -189,7 +189,7 @@ private fun PetGridCard(
     ) {
         Column(Modifier.padding(14.dp)) {
 
-            // ✅ avatar
+            //avatar
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     modifier = Modifier.size(44.dp),
