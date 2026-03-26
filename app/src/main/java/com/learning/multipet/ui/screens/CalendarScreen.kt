@@ -22,8 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Pets
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -35,6 +33,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -68,6 +67,7 @@ fun CalendarScreen(
         state.logs
             .filter { it.date == selectedDate }
             .filter { filterPetId == null || it.petId == filterPetId }
+            .sortedByDescending { it.type.name }
     }
 
     Box(
@@ -75,92 +75,105 @@ fun CalendarScreen(
             .fillMaxSize()
             .background(colors.background)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Spacer(Modifier.height(20.dp))
-
-            if (state.pets.isEmpty()) {
+        if (state.pets.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+            ) {
+                Spacer(Modifier.height(20.dp))
                 CalendarEmptyStateCard(
                     title = "Add a pet first",
                     subtitle = "Records and logs are linked to pets. Add your dog or cat to begin tracking activity and care updates.",
                     buttonText = "Go to Pets",
                     onClick = onGoManage
                 )
-                return
             }
+            return@Box
+        }
 
-            FilterSection(
-                pets = state.pets.map { it.id to it.name },
-                selectedPetId = filterPetId,
-                onSelectAll = { filterPetId = null },
-                onSelectPet = { filterPetId = it }
-            )
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item { Spacer(Modifier.height(20.dp)) }
 
-            Spacer(Modifier.height(18.dp))
-
-            MonthHeaderModern(
-                month = month,
-                onPrev = { month = month.minusMonths(1) },
-                onNext = { month = month.plusMonths(1) }
-            )
-
-            Spacer(Modifier.height(14.dp))
-
-            Surface(
-                shape = RoundedCornerShape(22.dp),
-                color = colors.surface,
-                border = BorderStroke(1.dp, colors.outline),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                    ModernCalendar(
-                        month = month,
-                        selected = selectedDate,
-                        hasLog = { date ->
-                            state.logs.any {
-                                it.date == date && (filterPetId == null || it.petId == filterPetId)
-                            }
-                        },
-                        onSelect = { selectedDate = it }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(18.dp))
-
-            LogsHeader(
-                selectedDate = selectedDate,
-                onJumpToday = { selectedDate = LocalDate.now() }
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            if (logsForDate.isEmpty()) {
-                CalendarEmptyStateCard(
-                    title = "No logs for this date",
-                    subtitle = "There are no records available for the selected date. Try another date or add a new log.",
-                    buttonText = "Today",
-                    onClick = { selectedDate = LocalDate.now() }
+            item {
+                FilterSection(
+                    pets = state.pets.map { it.id to it.name },
+                    selectedPetId = filterPetId,
+                    onSelectAll = { filterPetId = null },
+                    onSelectPet = { filterPetId = it }
                 )
-            } else {
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    items(logsForDate) { entry ->
-                        val petName = state.pets.find { it.id == entry.petId }?.name ?: "Pet"
+            }
 
-                        LogEntryCard(
-                            type = entry.type.name.replace("_", " "),
-                            petName = petName,
-                            note = entry.note.ifBlank { "No details provided." }
+            item {
+                MonthHeaderModern(
+                    month = month,
+                    onPrev = { month = month.minusMonths(1) },
+                    onNext = { month = month.plusMonths(1) }
+                )
+            }
+
+            item {
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = colors.surface,
+                    border = BorderStroke(1.dp, colors.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        ModernCalendar(
+                            month = month,
+                            selected = selectedDate,
+                            hasLog = { date ->
+                                state.logs.any {
+                                    it.date == date && (filterPetId == null || it.petId == filterPetId)
+                                }
+                            },
+                            onSelect = { selectedDate = it }
                         )
                     }
                 }
             }
+
+            item {
+                LogsHeader(
+                    selectedDate = selectedDate,
+                    logCount = logsForDate.size,
+                    onJumpToday = {
+                        selectedDate = LocalDate.now()
+                        month = YearMonth.from(selectedDate)
+                    }
+                )
+            }
+
+            if (logsForDate.isEmpty()) {
+                item {
+                    CalendarEmptyStateCard(
+                        title = "No logs for this date",
+                        subtitle = "There are no records available for the selected date. Try another date or add a new log.",
+                        buttonText = "Today",
+                        onClick = {
+                            selectedDate = LocalDate.now()
+                            month = YearMonth.from(selectedDate)
+                        }
+                    )
+                }
+            } else {
+                items(logsForDate) { entry ->
+                    val petName = state.pets.find { it.id == entry.petId }?.name ?: "Pet"
+                    LogEntryCard(
+                        type = entry.type.name,
+                        petName = petName,
+                        note = entry.note.ifBlank { "No details provided." }
+                    )
+                }
+            }
+
+            item { Spacer(Modifier.height(24.dp)) }
         }
     }
 }
@@ -398,38 +411,33 @@ private fun CalendarDayTile(
 @Composable
 private fun LogsHeader(
     selectedDate: LocalDate,
+    logCount: Int,
     onJumpToday: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
 
     Row(
         modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
+        Column {
             Text(
                 text = "Logs",
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.onBackground,
-                fontWeight = FontWeight.SemiBold
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.onBackground
             )
-            Spacer(Modifier.height(2.dp))
             Text(
-                text = selectedDate.toString(),
-                style = MaterialTheme.typography.bodySmall,
+                text = "$selectedDate • $logCount log${if (logCount == 1) "" else "s"}",
+                style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant
             )
         }
 
-        AssistChip(
-            onClick = onJumpToday,
-            label = { Text("Today") },
-            colors = AssistChipDefaults.assistChipColors(
-                containerColor = colors.surfaceVariant,
-                labelColor = colors.onSurfaceVariant
-            ),
-            border = BorderStroke(1.dp, colors.outline)
-        )
+        TextButton(onClick = onJumpToday) {
+            Text("Today")
+        }
     }
 }
 
@@ -440,6 +448,8 @@ private fun LogEntryCard(
     note: String
 ) {
     val colors = MaterialTheme.colorScheme
+    val label = formatLogType(type)
+    val icon = logTypeEmoji(type)
 
     ElevatedCard(
         shape = RoundedCornerShape(18.dp),
@@ -461,7 +471,7 @@ private fun LogEntryCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = type.take(1),
+                    text = icon,
                     color = colors.primary,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium
@@ -472,7 +482,7 @@ private fun LogEntryCard(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = type,
+                    text = label,
                     style = MaterialTheme.typography.titleSmall,
                     color = colors.onSurface,
                     fontWeight = FontWeight.SemiBold
@@ -491,12 +501,30 @@ private fun LogEntryCard(
                 Text(
                     text = note,
                     color = colors.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    style = MaterialTheme.typography.bodySmall
                 )
             }
         }
+    }
+}
+
+private fun formatLogType(raw: String): String {
+    return raw
+        .replace("_", " ")
+        .lowercase()
+        .replaceFirstChar { it.uppercase() }
+}
+
+private fun logTypeEmoji(type: String): String {
+    return when (type.uppercase()) {
+        "APPETITE" -> "🍽️"
+        "ENERGY" -> "💛"
+        "WEIGHT" -> "⚖️"
+        "VACCINE" -> "💉"
+        "DEWORM" -> "🩺"
+        "STOOL" -> "💩"
+        "NOTES" -> "📝"
+        else -> "🐾"
     }
 }
 

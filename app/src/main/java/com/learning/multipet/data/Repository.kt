@@ -59,6 +59,47 @@ class Repository {
         }
     }
 
+    fun updateLog(updatedLog: LogEntry) {
+        _state.update { s ->
+            s.copy(
+                logs = s.logs.map { existing ->
+                    if (existing.id == updatedLog.id) updatedLog else existing
+                },
+                lastActivePetId = updatedLog.petId
+            )
+        }
+    }
+
+    fun deleteLog(logId: String) {
+        _state.update { s ->
+            val logToDelete = s.logs.find { it.id == logId } ?: return@update s
+
+            val remainingLogs = s.logs.filterNot { it.id == logId }
+
+            val updatedPets = s.pets.map { pet ->
+                if (pet.id != logToDelete.petId) {
+                    pet
+                } else {
+                    when (logToDelete.type) {
+                        LogType.VACCINE -> {
+                            val stillHasVaccineLog = remainingLogs.any { entry ->
+                                entry.petId == pet.id && entry.type == LogType.VACCINE
+                            }
+                            pet.copy(vaccinated = stillHasVaccineLog)
+                        }
+                        else -> pet
+                    }
+                }
+            }
+
+            s.copy(
+                pets = updatedPets,
+                logs = remainingLogs,
+                lastActivePetId = logToDelete.petId
+            )
+        }
+    }
+
     fun logsFor(date: LocalDate, petId: String?): List<LogEntry> {
         val s = _state.value
         return s.logs.filter { it.date == date && (petId == null || it.petId == petId) }
