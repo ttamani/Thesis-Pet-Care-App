@@ -35,7 +35,7 @@ class AppViewModel(
         listOf(
             ChatMessage(
                 role = ChatRole.AI,
-                text = "Hi! I can provide general and safety-focused pet-care guidance."
+                text = "Hi! I can provide general and safety-focused pet-care guidance. Choose one or more pets above, or ask in general mode."
             )
         )
     )
@@ -50,7 +50,14 @@ class AppViewModel(
     fun selectPet(petId: String) = repo.selectPet(petId)
 
     fun addLog(petId: String, date: LocalDate, type: LogType, note: String) {
-        repo.addLog(LogEntry(petId = petId, date = date, type = type, note = note))
+        repo.addLog(
+            LogEntry(
+                petId = petId,
+                date = date,
+                type = type,
+                note = note
+            )
+        )
     }
 
     fun updateLog(updatedLog: LogEntry) {
@@ -61,21 +68,10 @@ class AppViewModel(
         repo.deleteLog(logId)
     }
 
-    fun resolvedPetForAI(): Pet? {
-        val s = state.value
-        val pets = s.pets
-        if (pets.isEmpty()) return null
-        if (pets.size == 1) return pets.first()
-
-        val id = s.lastActivePetId ?: s.selectedPetId ?: pets.first().id
-        return pets.find { it.id == id } ?: pets.first()
-    }
-
     fun upsertPet(pet: Pet) = repo.upsertPet(pet)
 
     fun sendAiMessage(
-        petName: String?,
-        species: String?,
+        selectedPetIds: Set<String>,
         userMessage: String
     ) {
         val trimmed = userMessage.trim()
@@ -89,9 +85,25 @@ class AppViewModel(
         viewModelScope.launch {
             _isAiLoading.value = true
             try {
+                val currentState = state.value
+
+                val selectedPets = currentState.pets.filter { it.id in selectedPetIds }
+
+                val relatedLogs = if (selectedPets.isEmpty()) {
+                    currentState.logs
+                        .sortedByDescending { it.date }
+                        .take(12)
+                } else {
+                    val selectedIds = selectedPets.map { it.id }.toSet()
+                    currentState.logs
+                        .filter { it.petId in selectedIds }
+                        .sortedByDescending { it.date }
+                        .take(12)
+                }
+
                 val reply = geminiRepository.generatePetCareReply(
-                    petName = petName,
-                    species = species,
+                    selectedPets = selectedPets,
+                    relatedLogs = relatedLogs,
                     userMessage = trimmed
                 )
 
@@ -114,7 +126,7 @@ class AppViewModel(
         _chatMessages.value = listOf(
             ChatMessage(
                 role = ChatRole.AI,
-                text = "Hi! I can provide general and safety-focused pet-care guidance."
+                text = "Hi! I can provide general and safety-focused pet-care guidance. Choose one or more pets above, or ask in general mode."
             )
         )
     }

@@ -4,14 +4,22 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,9 +37,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -89,6 +94,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -260,87 +266,106 @@ fun HomeScreen(
         }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background)
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-    ) {
-        DashboardOverviewCard(
-            petCount = state.pets.size,
-            attentionNeeded = attentionNeeded,
-            dueVaccines = vaccinesDue
-        )
+    val gridRows = remember(filteredPets) { filteredPets.chunked(2) }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        QuickActionsRow(
-            onRecords = onOpenCalendar,
-            onFindVet = onFindVet,
-            onAiCare = onOpenAi
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+    Scaffold(
+        containerColor = colors.background
+    ) { innerPadding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(innerPadding),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = 16.dp,
+                bottom = 24.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Pets",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = colors.onBackground,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Text(
-                    text = "${filteredPets.size} visible",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant
+            item {
+                DashboardOverviewCard(
+                    petCount = state.pets.size,
+                    attentionNeeded = attentionNeeded,
+                    dueVaccines = vaccinesDue
                 )
             }
 
-            ViewToggleButton(
-                current = viewMode,
-                onChange = onViewModeChange
-            )
-
-            Spacer(Modifier.width(8.dp))
-
-            TextButton(onClick = onGoManage) {
-                Text("Manage")
+            item {
+                QuickActionsRow(
+                    onRecords = onOpenCalendar,
+                    onFindVet = onFindVet,
+                    onAiCare = onOpenAi
+                )
             }
-        }
 
-        Spacer(modifier = Modifier.height(10.dp))
+            item {
+                PremiumSectionShell {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Pets",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = colors.onSurface,
+                                fontWeight = FontWeight.SemiBold
+                            )
 
-        PetFilterChips(
-            selected = selectedFilter,
-            onSelected = { selectedFilter = it }
-        )
+                            Spacer(modifier = Modifier.height(2.dp))
 
-        Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "${filteredPets.size} visible",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant
+                            )
+                        }
 
-        if (state.pets.isEmpty()) {
-            HomeEmptyStateCard(
-                title = "No pets added yet",
-                subtitle = "Add your first dog or cat to begin tracking care and logs.",
-                onGoManage = onGoManage
-            )
-        } else if (filteredPets.isEmpty()) {
-            HomeEmptyStateCard(
-                title = "No matching pets",
-                subtitle = "Try another filter to view more pets.",
-                onGoManage = null
-            )
-        } else {
-            if (viewMode == PetViewMode.LIST) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 12.dp)
-                ) {
+                        ViewToggleButton(
+                            current = viewMode,
+                            onChange = onViewModeChange
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        TextButton(onClick = onGoManage) {
+                            Text("Manage")
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    PetFilterChips(
+                        selected = selectedFilter,
+                        onSelected = { selectedFilter = it }
+                    )
+                }
+            }
+
+            when {
+                state.pets.isEmpty() -> {
+                    item {
+                        HomeEmptyStateCard(
+                            title = "No pets added yet",
+                            subtitle = "Add your first dog or cat to begin tracking care and logs.",
+                            onGoManage = onGoManage
+                        )
+                    }
+                }
+
+                filteredPets.isEmpty() -> {
+                    item {
+                        HomeEmptyStateCard(
+                            title = "No matching pets",
+                            subtitle = "Try another filter to view more pets.",
+                            onGoManage = null
+                        )
+                    }
+                }
+
+                viewMode == PetViewMode.LIST -> {
                     items(filteredPets, key = { it.id }) { pet ->
                         ModernPetListCard(
                             pet = pet,
@@ -351,21 +376,28 @@ fun HomeScreen(
                         )
                     }
                 }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    contentPadding = PaddingValues(bottom = 12.dp)
-                ) {
-                    items(filteredPets, key = { it.id }) { pet ->
-                        ModernPetGridCard(
-                            pet = pet,
-                            onClick = {
-                                vm.selectPet(pet.id)
-                                selectedPet = pet
+
+                else -> {
+                    items(gridRows) { rowPets ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowPets.forEach { pet ->
+                                ModernPetGridCard(
+                                    pet = pet,
+                                    onClick = {
+                                        vm.selectPet(pet.id)
+                                        selectedPet = pet
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
                             }
-                        )
+
+                            if (rowPets.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }
@@ -511,118 +543,29 @@ fun HomeScreen(
             }
         )
     }
-
 }
 
 @Composable
-private fun ModernPetGridCard(
-    pet: Pet,
-    onClick: () -> Unit
+private fun PremiumSectionShell(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
 
-    ElevatedCard(
-        onClick = onClick,
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = colors.surface
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = colors.surface.copy(alpha = 0.98f),
+        tonalElevation = 2.dp,
+        shadowElevation = 2.dp,
+        border = BorderStroke(
+            1.dp,
+            colors.outlineVariant.copy(alpha = 0.22f)
         )
     ) {
-        Column {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp)
-                    .background(colors.surfaceVariant)
-            ) {
-                if (pet.imageUri.isNullOrBlank()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Pets,
-                            contentDescription = null,
-                            tint = colors.primary,
-                            modifier = Modifier.size(32.dp)
-                        )
-                    }
-                } else {
-                    Image(
-                        painter = rememberAsyncImagePainter(pet.imageUri),
-                        contentDescription = "Pet photo",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.padding(12.dp)) {
-                Text(
-                    text = pet.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = colors.onSurface,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
-                )
-
-                Text(
-                    text = pet.breed,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ViewToggleButton(
-    current: PetViewMode,
-    onChange: (PetViewMode) -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
-
-    Surface(
-        shape = RoundedCornerShape(14.dp),
-        color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
-    ) {
-        Row {
-            ToggleItem(
-                selected = current == PetViewMode.LIST,
-                text = "List",
-                onClick = { onChange(PetViewMode.LIST) }
-            )
-
-            ToggleItem(
-                selected = current == PetViewMode.GRID,
-                text = "Grid",
-                onClick = { onChange(PetViewMode.GRID) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToggleItem(
-    selected: Boolean,
-    text: String,
-    onClick: () -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
-
-    Surface(
-        onClick = onClick,
-        color = if (selected) colors.primary.copy(alpha = 0.15f) else Color.Transparent,
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) colors.primary else colors.onSurfaceVariant
+        Column(
+            modifier = Modifier.padding(16.dp),
+            content = content
         )
     }
 }
@@ -638,9 +581,11 @@ private fun DashboardOverviewCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(28.dp),
         color = colors.surface,
-        border = BorderStroke(1.dp, colors.outline)
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.24f))
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
@@ -661,7 +606,7 @@ private fun DashboardOverviewCard(
                     label = "Pets",
                     value = petCount.toString(),
                     valueColor = colors.onSurface,
-                    containerColor = colors.surfaceVariant
+                    containerColor = colors.surfaceVariant.copy(alpha = 0.72f)
                 )
 
                 CompactStatCard(
@@ -670,9 +615,9 @@ private fun DashboardOverviewCard(
                     value = attentionNeeded.toString(),
                     valueColor = if (attentionNeeded > 0) colors.tertiary else success,
                     containerColor = if (attentionNeeded > 0) {
-                        colors.tertiary.copy(alpha = 0.14f)
+                        colors.tertiary.copy(alpha = 0.12f)
                     } else {
-                        success.copy(alpha = 0.14f)
+                        success.copy(alpha = 0.12f)
                     }
                 )
 
@@ -682,9 +627,9 @@ private fun DashboardOverviewCard(
                     value = dueVaccines.toString(),
                     valueColor = if (dueVaccines > 0) colors.tertiary else colors.primary,
                     containerColor = if (dueVaccines > 0) {
-                        colors.tertiary.copy(alpha = 0.14f)
+                        colors.tertiary.copy(alpha = 0.12f)
                     } else {
-                        colors.primary.copy(alpha = 0.14f)
+                        colors.primary.copy(alpha = 0.12f)
                     }
                 )
             }
@@ -704,9 +649,9 @@ private fun CompactStatCard(
 
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         color = containerColor,
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.20f))
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
             Text(
@@ -715,7 +660,7 @@ private fun CompactStatCard(
                 style = MaterialTheme.typography.labelSmall
             )
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             Text(
                 text = value,
@@ -735,71 +680,186 @@ private fun QuickActionsRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        CompactQuickAction(
+        PremiumQuickActionCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.Description,
             label = "Records",
+            subtitle = "View logs",
             onClick = onRecords
         )
 
-        CompactQuickAction(
+        PremiumQuickActionCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.LocationOn,
             label = "Find Vet",
+            subtitle = "Nearby clinics",
             onClick = onFindVet
         )
 
-        CompactQuickAction(
+        PremiumQuickActionCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.AutoAwesome,
             label = "AI Care",
+            subtitle = "Ask assistant",
             onClick = onAiCare
         )
     }
 }
 
 @Composable
-private fun CompactQuickAction(
+private fun PremiumQuickActionCard(
     modifier: Modifier = Modifier,
     icon: ImageVector,
     label: String,
+    subtitle: String,
     onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "quick_action_scale"
+    )
+
+    val elevation by animateDpAsState(
+        targetValue = if (pressed) 1.dp else 4.dp,
+        label = "quick_action_elevation"
+    )
+
+    ElevatedCard(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        modifier = modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = colors.surface
+        ),
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = elevation,
+            pressedElevation = 1.dp
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 16.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = colors.primary.copy(alpha = 0.10f)
+            ) {
+                Box(
+                    modifier = Modifier.size(42.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = colors.primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = label,
+                color = colors.onSurface,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = subtitle,
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+@Composable
+private fun ViewToggleButton(
+    current: PetViewMode,
+    onChange: (PetViewMode) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
 
     Surface(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        shape = RoundedCornerShape(18.dp),
+        color = colors.surfaceVariant.copy(alpha = 0.55f)
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Surface(
-                shape = CircleShape,
-                color = colors.primary.copy(alpha = 0.14f)
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = colors.primary,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
+            PremiumToggleChip(
+                selected = current == PetViewMode.LIST,
+                text = "List",
+                onClick = { onChange(PetViewMode.LIST) }
+            )
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = label,
-                color = colors.onSurfaceVariant,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium
+            PremiumToggleChip(
+                selected = current == PetViewMode.GRID,
+                text = "Grid",
+                onClick = { onChange(PetViewMode.GRID) }
             )
         }
+    }
+}
+
+@Composable
+private fun PremiumToggleChip(
+    selected: Boolean,
+    text: String,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = tween(120),
+        label = "toggle_scale"
+    )
+
+    Surface(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) colors.surface else Color.Transparent,
+        tonalElevation = if (selected) 2.dp else 0.dp,
+        shadowElevation = if (selected) 1.dp else 0.dp,
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) colors.onSurface else colors.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+        )
     }
 }
 
@@ -809,7 +869,7 @@ private fun PetFilterChips(
     onSelected: (PetFilter) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    val items = listOf(
+    val filterItems = listOf(
         PetFilter.ALL to "All",
         PetFilter.DOGS to "Dogs",
         PetFilter.CATS to "Cats",
@@ -818,7 +878,7 @@ private fun PetFilterChips(
     )
 
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(items) { (filter, label) ->
+        items(filterItems) { (filter, label) ->
             FilterChip(
                 selected = selected == filter,
                 onClick = { onSelected(filter) },
@@ -841,6 +901,42 @@ private fun PetFilterChips(
 }
 
 @Composable
+private fun PremiumPetCardContainer(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.985f else 1f,
+        animationSpec = tween(140),
+        label = "pet_card_scale"
+    )
+
+    ElevatedCard(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        modifier = modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
+        shape = RoundedCornerShape(24.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = colors.surface
+        ),
+        elevation = CardDefaults.elevatedCardElevation(
+            defaultElevation = 2.dp,
+            pressedElevation = 1.dp
+        )
+    ) {
+        Column(content = content)
+    }
+}
+
+@Composable
 private fun ModernPetListCard(
     pet: Pet,
     onClick: () -> Unit
@@ -850,23 +946,20 @@ private fun ModernPetListCard(
     val statusColor = if (pet.vaccinated) success else colors.tertiary
     val speciesLabel = if (pet.species == Species.DOG) "Dog" else "Cat"
 
-    ElevatedCard(
-        onClick = onClick,
+    PremiumPetCardContainer(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = colors.surface),
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+        onClick = onClick
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(108.dp)
+                .height(112.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .width(108.dp)
+                    .width(112.dp)
                     .fillMaxSize()
-                    .background(colors.surfaceVariant)
+                    .background(colors.surfaceVariant.copy(alpha = 0.72f))
             ) {
                 if (pet.imageUri.isNullOrBlank()) {
                     Box(
@@ -875,7 +968,7 @@ private fun ModernPetListCard(
                     ) {
                         Surface(
                             shape = CircleShape,
-                            color = colors.primary.copy(alpha = 0.14f)
+                            color = colors.primary.copy(alpha = 0.12f)
                         ) {
                             Box(
                                 modifier = Modifier.size(52.dp),
@@ -939,13 +1032,94 @@ private fun ModernPetListCard(
 }
 
 @Composable
+private fun ModernPetGridCard(
+    pet: Pet,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    val success = Color(0xFF22C55E)
+    val statusColor = if (pet.vaccinated) success else colors.tertiary
+
+    PremiumPetCardContainer(
+        modifier = modifier,
+        onClick = onClick
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(132.dp)
+                .background(colors.surfaceVariant.copy(alpha = 0.72f))
+        ) {
+            if (pet.imageUri.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = colors.primary.copy(alpha = 0.12f)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(54.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Pets,
+                                contentDescription = null,
+                                tint = colors.primary,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                Image(
+                    painter = rememberAsyncImagePainter(pet.imageUri),
+                    contentDescription = "Pet photo",
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = pet.name,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = pet.breed,
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.onSurfaceVariant,
+                maxLines = 1
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            SmallStatusBadge(
+                text = if (pet.vaccinated) "Vaccinated" else "Needs vaccine",
+                background = statusColor.copy(alpha = 0.14f),
+                content = statusColor
+            )
+        }
+    }
+}
+
+@Composable
 private fun SmallInfoBadge(text: String) {
     val colors = MaterialTheme.colorScheme
 
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        color = colors.surfaceVariant.copy(alpha = 0.70f),
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.18f))
     ) {
         Text(
             text = text,
@@ -977,6 +1151,73 @@ private fun SmallStatusBadge(
 }
 
 @Composable
+private fun HomeEmptyStateCard(
+    title: String,
+    subtitle: String,
+    onGoManage: (() -> Unit)? = null
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = colors.surface,
+        tonalElevation = 2.dp,
+        shadowElevation = 2.dp,
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = CircleShape,
+                color = colors.primary.copy(alpha = 0.14f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Pets,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.padding(14.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = subtitle,
+                color = colors.onSurfaceVariant,
+                style = MaterialTheme.typography.bodyMedium
+            )
+
+            if (onGoManage != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onGoManage,
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.primary,
+                        contentColor = colors.onPrimary
+                    )
+                ) {
+                    Text("Add Pet")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun FullScreenPetProfile(
     pet: Pet,
     vm: AppViewModel,
@@ -988,14 +1229,20 @@ private fun FullScreenPetProfile(
     val state by vm.state.collectAsState()
     val colors = MaterialTheme.colorScheme
     val success = Color(0xFF22C55E)
+
     val currentPet = remember(state.pets, pet.id) {
         state.pets.find { it.id == pet.id } ?: pet
     }
+
     val petLogs = remember(state.logs, currentPet.id) {
         state.logs
             .filter { it.petId == currentPet.id }
-            .sortedWith(compareByDescending<com.learning.multipet.data.LogEntry> { it.date }.thenByDescending { it.id })
+            .sortedWith(
+                compareByDescending<LogEntry> { it.date }
+                    .thenByDescending { it.id }
+            )
     }
+
     val recentLogs = petLogs.take(8)
     val speciesLabel = if (currentPet.species == Species.DOG) "Dog" else "Cat"
     val statusColor = if (currentPet.vaccinated) success else colors.tertiary
@@ -1055,7 +1302,9 @@ private fun FullScreenPetProfile(
                 Surface(
                     shape = RoundedCornerShape(26.dp),
                     color = colors.surface,
-                    border = BorderStroke(1.dp, colors.outline)
+                    tonalElevation = 2.dp,
+                    shadowElevation = 2.dp,
+                    border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
                 ) {
                     Column {
                         Box(
@@ -1136,7 +1385,7 @@ private fun FullScreenPetProfile(
                             Surface(
                                 shape = RoundedCornerShape(18.dp),
                                 color = colors.surfaceVariant,
-                                border = BorderStroke(1.dp, colors.outline),
+                                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f)),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(
@@ -1164,9 +1413,15 @@ private fun FullScreenPetProfile(
                 Surface(
                     shape = RoundedCornerShape(22.dp),
                     color = colors.surface,
-                    border = BorderStroke(1.dp, colors.outline)
+                    tonalElevation = 2.dp,
+                    shadowElevation = 2.dp,
+                    border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
                         Text(
                             text = "Quick Logs",
                             style = MaterialTheme.typography.titleMedium,
@@ -1199,7 +1454,9 @@ private fun FullScreenPetProfile(
                 Surface(
                     shape = RoundedCornerShape(22.dp),
                     color = colors.surface,
-                    border = BorderStroke(1.dp, colors.outline)
+                    tonalElevation = 2.dp,
+                    shadowElevation = 2.dp,
+                    border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
@@ -1293,7 +1550,7 @@ private fun ProfileMetaChip(text: String) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     ) {
         Text(
             text = text,
@@ -1332,6 +1589,7 @@ private fun QuickLogGrid(
                 onClick = onStool
             )
         }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1351,6 +1609,7 @@ private fun QuickLogGrid(
                 onClick = onWeight
             )
         }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -1376,12 +1635,25 @@ private fun QuickLogActionCard(
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.98f else 1f,
+        animationSpec = tween(120),
+        label = "quick_log_action_scale"
+    )
 
     Surface(
-        modifier = modifier.clickable(onClick = onClick),
+        onClick = onClick,
+        interactionSource = interactionSource,
+        modifier = modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        },
         shape = RoundedCornerShape(18.dp),
         color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     ) {
         Column(
             modifier = Modifier
@@ -1435,7 +1707,7 @@ private fun QuickLogChip(
             labelColor = colors.onSurfaceVariant,
             leadingIconContentColor = colors.primary
         ),
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     )
 }
 
@@ -1463,8 +1735,10 @@ private fun SwipeToDeleteLogCard(
         enableDismissFromStartToEnd = false,
         enableDismissFromEndToStart = true,
         backgroundContent = {
-            val isDismissed = dismissState.targetValue == SwipeToDismissBoxValue.EndToStart ||
-                    dismissState.currentValue == SwipeToDismissBoxValue.EndToStart
+            val isDismissed =
+                dismissState.targetValue == SwipeToDismissBoxValue.EndToStart ||
+                        dismissState.currentValue == SwipeToDismissBoxValue.EndToStart
+
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
@@ -1519,7 +1793,7 @@ private fun PetLogCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     ) {
         Column(
             modifier = Modifier
@@ -1634,70 +1908,6 @@ private fun EditLogDialog(
         }
     )
 }
-@Composable
-private fun HomeEmptyStateCard(
-    title: String,
-    subtitle: String,
-    onGoManage: (() -> Unit)? = null
-) {
-    val colors = MaterialTheme.colorScheme
-
-    Surface(
-        shape = RoundedCornerShape(24.dp),
-        color = colors.surface,
-        border = BorderStroke(1.dp, colors.outline)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = colors.primary.copy(alpha = 0.14f)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Pets,
-                    contentDescription = null,
-                    tint = colors.primary,
-                    modifier = Modifier.padding(14.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = colors.onSurface,
-                fontWeight = FontWeight.SemiBold
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = subtitle,
-                color = colors.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium
-            )
-
-            if (onGoManage != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = onGoManage,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = colors.primary,
-                        contentColor = colors.onPrimary
-                    )
-                ) {
-                    Text("Add Pet")
-                }
-            }
-        }
-    }
-}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -1712,12 +1922,14 @@ private fun QuickLogDialog(
     onSaveVaccine: (VaccineLogAction, String) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+
     var selectedEmotion by remember { mutableStateOf(PetEmotion.JOY) }
     var selectedAppetite by remember { mutableStateOf(AppetiteLevel.NORMAL) }
     var selectedStool by remember { mutableStateOf(StoolLevel.NORMAL) }
     var selectedVaccineAction by remember { mutableStateOf(VaccineLogAction.VACCINATED) }
     var weightText by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+
     val canSave = when (category) {
         QuickLogCategory.WEIGHT -> weightText.trim().toDoubleOrNull() != null
         else -> true
@@ -1788,7 +2000,7 @@ private fun QuickLogDialog(
                                 },
                                 border = BorderStroke(
                                     1.dp,
-                                    if (selectedAppetite == level) colors.primary else colors.outline
+                                    if (selectedAppetite == level) colors.primary else colors.outlineVariant
                                 )
                             ) {
                                 Row(
@@ -1853,7 +2065,7 @@ private fun QuickLogDialog(
                                     border = FilterChipDefaults.filterChipBorder(
                                         enabled = true,
                                         selected = selectedStool == stool,
-                                        borderColor = colors.outline,
+                                        borderColor = colors.outlineVariant,
                                         selectedBorderColor = colors.primary
                                     )
                                 )
@@ -1895,7 +2107,7 @@ private fun QuickLogDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
                             color = colors.surfaceVariant,
-                            border = BorderStroke(1.dp, colors.outline)
+                            border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
                         ) {
                             Column(
                                 modifier = Modifier
@@ -1989,7 +2201,6 @@ private fun QuickLogDialog(
     )
 }
 
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun EmotionSwipeSelector(
@@ -2000,6 +2211,7 @@ private fun EmotionSwipeSelector(
     val colors = MaterialTheme.colorScheme
     val emotions = PetEmotion.entries
     val initialPage = emotions.indexOf(selectedEmotion).coerceAtLeast(0)
+
     val pagerState = rememberPagerState(
         initialPage = initialPage,
         pageCount = { emotions.size }
@@ -2066,7 +2278,6 @@ private fun EmotionSwipeSelector(
     }
 }
 
-@Composable
 private fun emotionImageRes(
     pet: Pet,
     emotion: PetEmotion
@@ -2079,6 +2290,7 @@ private fun emotionImageRes(
             PetEmotion.ANXIETY -> R.drawable.cat_anxiety
             PetEmotion.LOVE -> R.drawable.cat_love
         }
+
         Species.DOG -> when (emotion) {
             PetEmotion.JOY -> R.drawable.dog_joy
             PetEmotion.FEAR -> R.drawable.dog_sad
@@ -2088,6 +2300,7 @@ private fun emotionImageRes(
         }
     }
 }
+
 @Composable
 private fun EmotionSwipeCard(
     pet: Pet,
