@@ -1,4 +1,3 @@
-// git test
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,12 +6,12 @@ plugins {
 
 android {
     namespace = "com.learning.multipet"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.learning.multipet"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

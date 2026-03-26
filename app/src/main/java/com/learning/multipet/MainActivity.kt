@@ -81,7 +81,6 @@ import com.learning.multipet.viewmodel.AppViewModel
 import com.learning.multipet.viewmodel.SessionViewModel
 import kotlinx.coroutines.delay
 
-val a = 0
 enum class BottomTab(
     val label: String,
     val icon: ImageVector,
@@ -130,6 +129,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
+            //Supabase test
+            supabase()
+
             AppRoot()
         }
     }
