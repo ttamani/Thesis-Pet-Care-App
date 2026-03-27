@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,19 +21,24 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ViewAgenda
+import androidx.compose.material.icons.filled.Wc
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -42,13 +48,13 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -59,9 +65,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -71,6 +78,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,17 +87,35 @@ import coil.compose.AsyncImage
 import com.learning.multipet.data.Pet
 import com.learning.multipet.data.Species
 import com.learning.multipet.viewmodel.AppViewModel
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
-private val DOG_BREEDS = listOf(
-    "Aspin", "Beagle", "Chihuahua", "Golden Retriever",
-    "Husky", "Labrador", "Poodle", "Shih Tzu"
+private val DOG_BREEDS: List<String> = listOf(
+    "Aspin",
+    "Beagle",
+    "Chihuahua",
+    "Golden Retriever",
+    "Husky",
+    "Labrador",
+    "Poodle",
+    "Shih Tzu"
 )
 
-private val CAT_BREEDS = listOf(
-    "Domestic Shorthair", "Persian", "Siamese",
-    "Maine Coon", "Ragdoll", "Bengal"
+private val CAT_BREEDS: List<String> = listOf(
+    "Domestic Shorthair",
+    "Persian",
+    "Siamese",
+    "Maine Coon",
+    "Ragdoll",
+    "Bengal"
 )
+
+private enum class ManagePetsViewMode {
+    LIST,
+    GRID
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,65 +124,128 @@ fun ManagePetsScreen(vm: AppViewModel) {
     val colors = MaterialTheme.colorScheme
 
     var editorOpen by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<Pet?>(null) }
+    var editingPet by remember { mutableStateOf<Pet?>(null) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var viewMode by rememberSaveable { mutableStateOf(ManagePetsViewMode.LIST) }
+
+    val filteredPets: List<Pet> = remember(state.pets, searchQuery) {
+        val normalizedQuery: String = searchQuery.trim()
+        if (normalizedQuery.isBlank()) {
+            state.pets
+        } else {
+            state.pets.filter { pet ->
+                pet.name.contains(normalizedQuery, ignoreCase = true) ||
+                        pet.breed.contains(normalizedQuery, ignoreCase = true) ||
+                        pet.species.name.contains(normalizedQuery, ignoreCase = true) ||
+                        pet.sex.contains(normalizedQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    val gridRows: List<List<Pet>> = remember(filteredPets) {
+        filteredPets.chunked(2)
+    }
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colors.background)
-    ) {
-        Scaffold(
-            containerColor = colors.background,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-        ) { padding ->
+    Scaffold(
+        containerColor = colors.background,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colors.background)
+                .padding(paddingValues)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
+        ) {
+            ManagePetsHeader(
+                petCount = state.pets.size,
+                onAddPet = {
+                    editingPet = null
+                    editorOpen = true
+                }
+            )
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-            ) {
-                if (state.pets.isEmpty()) {
-                    Column(
+            Spacer(modifier = Modifier.height(14.dp))
+
+            SearchAndViewBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                viewMode = viewMode,
+                onViewModeChange = { viewMode = it }
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            when {
+                state.pets.isEmpty() -> {
+                    EmptyPetsState()
+                }
+
+                filteredPets.isEmpty() -> {
+                    EmptySearchState()
+                }
+
+                viewMode == ManagePetsViewMode.LIST -> {
+                    LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.Center
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        EmptyPetsState(
-                            onAddPet = {
-                                editing = null
-                                editorOpen = true
-                            }
-                        )
-                    }
-                } else {
-                    ManagePetsHeader(
-                        petCount = state.pets.size,
-                        onAddPet = {
-                            editing = null
-                            editorOpen = true
-                        }
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(state.pets, key = { it.id }) { pet ->
-                            PetGridTile(
+                        items(
+                            items = filteredPets,
+                            key = { it.id }
+                        ) { pet ->
+                            PetListCard(
                                 pet = pet,
                                 isSelected = pet.id == state.selectedPetId,
                                 onClick = { vm.selectPet(pet.id) },
                                 onEdit = {
-                                    editing = pet
+                                    editingPet = pet
                                     editorOpen = true
                                 },
                                 onDelete = { vm.deletePet(pet.id) }
                             )
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(gridRows) { rowPets ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowPets.forEach { pet ->
+                                    PetGridCard(
+                                        pet = pet,
+                                        isSelected = pet.id == state.selectedPetId,
+                                        onClick = { vm.selectPet(pet.id) },
+                                        onEdit = {
+                                            editingPet = pet
+                                            editorOpen = true
+                                        },
+                                        onDelete = { vm.deletePet(pet.id) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                if (rowPets.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(8.dp))
                         }
                     }
                 }
@@ -168,7 +257,7 @@ fun ManagePetsScreen(vm: AppViewModel) {
         ModalBottomSheet(
             onDismissRequest = {
                 editorOpen = false
-                editing = null
+                editingPet = null
             },
             sheetState = sheetState,
             containerColor = colors.surface,
@@ -176,16 +265,16 @@ fun ManagePetsScreen(vm: AppViewModel) {
             dragHandle = null
         ) {
             AddEditPetSheet(
-                initial = editing,
+                initialPet = editingPet,
                 onDismiss = {
                     editorOpen = false
-                    editing = null
+                    editingPet = null
                 },
                 onSave = { pet ->
                     vm.upsertPet(pet)
                     vm.selectPet(pet.id)
                     editorOpen = false
-                    editing = null
+                    editingPet = null
                 }
             )
         }
@@ -198,44 +287,190 @@ private fun ManagePetsHeader(
     onAddPet: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(
-            modifier = Modifier.weight(1f)
-        ) {
-
-        }
-
-        Button(
-            onClick = onAddPet,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = colors.primary,
-                contentColor = colors.onPrimary
-            )
-        ) {
-            Text("Add Pet")
-        }
-    }
-}
-@Composable
-private fun EmptyPetsState(
-    onAddPet: () -> Unit
-) {
-    val colors = MaterialTheme.colorScheme
 
     Surface(
-        shape = RoundedCornerShape(24.dp),
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
         color = colors.surface,
-        border = BorderStroke(1.dp, colors.outline),
-        modifier = Modifier.fillMaxWidth()
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.5f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 24.dp),
+                .padding(18.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = colors.primary.copy(alpha = 0.12f)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Pets,
+                        contentDescription = null,
+                        tint = colors.primary,
+                        modifier = Modifier.padding(12.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Manage Pets",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (petCount == 0) {
+                            "Create pet profiles and manage them in one organized place."
+                        } else {
+                            "$petCount pet profile${if (petCount > 1) "s" else ""} available."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = colors.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            FilledTonalButton(
+                onClick = onAddPet,
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Pet")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchAndViewBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    viewMode: ManagePetsViewMode,
+    onViewModeChange: (ManagePetsViewMode) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            shape = RoundedCornerShape(18.dp),
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null
+                )
+            },
+            label = {
+                Text("Search pets")
+            },
+            placeholder = {
+                Text("Name, breed, species, sex")
+            }
+        )
+
+        ViewModeToggle(
+            viewMode = viewMode,
+            onViewModeChange = onViewModeChange
+        )
+    }
+}
+
+@Composable
+private fun ViewModeToggle(
+    viewMode: ManagePetsViewMode,
+    onViewModeChange: (ManagePetsViewMode) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = colors.surfaceVariant,
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.35f))
+    ) {
+        Row(
+            modifier = Modifier.padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            FilledTonalIconButton(
+                onClick = { onViewModeChange(ManagePetsViewMode.LIST) },
+                modifier = Modifier.size(42.dp),
+                colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (viewMode == ManagePetsViewMode.LIST) {
+                        colors.primary.copy(alpha = 0.14f)
+                    } else {
+                        Color.Transparent
+                    },
+                    contentColor = if (viewMode == ManagePetsViewMode.LIST) {
+                        colors.primary
+                    } else {
+                        colors.onSurfaceVariant
+                    }
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ViewAgenda,
+                    contentDescription = "List view"
+                )
+            }
+
+            FilledTonalIconButton(
+                onClick = { onViewModeChange(ManagePetsViewMode.GRID) },
+                modifier = Modifier.size(42.dp),
+                colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (viewMode == ManagePetsViewMode.GRID) {
+                        colors.primary.copy(alpha = 0.14f)
+                    } else {
+                        Color.Transparent
+                    },
+                    contentColor = if (viewMode == ManagePetsViewMode.GRID) {
+                        colors.primary
+                    } else {
+                        colors.onSurfaceVariant
+                    }
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GridView,
+                    contentDescription = "Grid view"
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun EmptyPetsState() {
+    val colors = MaterialTheme.colorScheme
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = colors.surface,
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.5f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Surface(
@@ -246,45 +481,66 @@ private fun EmptyPetsState(
                     imageVector = Icons.Default.Pets,
                     contentDescription = null,
                     tint = colors.primary,
-                    modifier = Modifier.padding(14.dp)
+                    modifier = Modifier.padding(16.dp)
                 )
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
                 text = "No pets added yet",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 color = colors.onSurface,
                 fontWeight = FontWeight.SemiBold
             )
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "Create your first pet profile to start tracking care records, health logs, and reminders.",
+                text = "Use the Add Pet button above to create your first pet profile.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant
             )
-
-            Spacer(Modifier.height(16.dp))
-
-            Button(
-                onClick = onAddPet,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = colors.primary,
-                    contentColor = colors.onPrimary
-                )
-            ) {
-                Text("Add Pet")
-            }
         }
     }
 }
 
 @Composable
-private fun PetGridTile(
+private fun EmptySearchState() {
+    val colors = MaterialTheme.colorScheme
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = colors.surface,
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.45f))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "No matching pets",
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.onSurface,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Try searching with a different name, breed, or species.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun PetListCard(
     pet: Pet,
     isSelected: Boolean,
     onClick: () -> Unit,
@@ -292,6 +548,7 @@ private fun PetGridTile(
     onDelete: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val ageLabel: String = formatPetAge(pet.birthDateMillis)
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -299,83 +556,89 @@ private fun PetGridTile(
         colors = CardDefaults.elevatedCardColors(
             containerColor = if (isSelected) colors.surfaceVariant else colors.surface
         ),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = Color.Transparent,
-                border = BorderStroke(
-                    1.dp,
-                    if (isSelected) colors.primary else colors.outline
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        modifier = Modifier.size(50.dp),
-                        shape = CircleShape,
-                        color = colors.surfaceVariant
-                    ) {
-                        if (pet.imageUri.isNullOrBlank()) {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Pets,
-                                    contentDescription = null,
-                                    tint = colors.onSurface
-                                )
-                            }
+                Surface(
+                    modifier = Modifier.size(58.dp),
+                    shape = CircleShape,
+                    color = colors.surfaceVariant,
+                    border = BorderStroke(
+                        width = 1.dp,
+                        color = if (isSelected) {
+                            colors.primary.copy(alpha = 0.45f)
                         } else {
-                            AsyncImage(
-                                model = pet.imageUri,
-                                contentDescription = "Pet photo",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Crop
+                            colors.outline.copy(alpha = 0.45f)
+                        }
+                    )
+                ) {
+                    if (pet.imageUri.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Pets,
+                                contentDescription = null,
+                                tint = colors.onSurfaceVariant
                             )
                         }
-                    }
-
-                    Spacer(Modifier.width(10.dp))
-
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            text = pet.name,
-                            color = colors.onSurface,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                        Text(
-                            text = "${pet.species} • ${pet.breed}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    } else {
+                        AsyncImage(
+                            model = pet.imageUri,
+                            contentDescription = "Pet photo",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = pet.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${pet.species} • ${pet.breed}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                MetaChip("${pet.ageYears}y")
-                MetaChip("${formatWeight(pet.weightKg)}kg")
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MetaChip(text = ageLabel)
+                MetaChip(text = "${formatWeight(pet.weightKg)} kg")
             }
 
-            StatusChip(
-                text = if (pet.vaccinated) "Vaccinated" else "Needs vaccine",
-                active = pet.vaccinated
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                MetaChip(text = formatShortDate(pet.birthDateMillis))
+                StatusChip(
+                    text = if (pet.vaccinated) "Vaccinated" else "Needs vaccine",
+                    active = pet.vaccinated
+                )
+            }
 
-            HorizontalDivider(color = colors.outline)
+            HorizontalDivider(color = colors.outline.copy(alpha = 0.45f))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -383,17 +646,133 @@ private fun PetGridTile(
             ) {
                 IconButton(onClick = onEdit) {
                     Icon(
-                        Icons.Default.Edit,
+                        imageVector = Icons.Default.Edit,
                         contentDescription = "Edit",
                         tint = colors.onSurfaceVariant
                     )
                 }
                 IconButton(onClick = onDelete) {
                     Icon(
-                        Icons.Default.Delete,
+                        imageVector = Icons.Default.Delete,
                         contentDescription = "Delete",
                         tint = colors.tertiary
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PetGridCard(
+    pet: Pet,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    val ageLabel: String = formatPetAge(pet.birthDateMillis)
+
+    ElevatedCard(
+        modifier = modifier,
+        onClick = onClick,
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = if (isSelected) colors.surfaceVariant else colors.surface
+        ),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp)
+                    .background(colors.surfaceVariant)
+            ) {
+                if (pet.imageUri.isNullOrBlank()) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = CircleShape,
+                            color = colors.primary.copy(alpha = 0.12f)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Pets,
+                                contentDescription = null,
+                                tint = colors.primary,
+                                modifier = Modifier.padding(14.dp)
+                            )
+                        }
+                    }
+                } else {
+                    AsyncImage(
+                        model = pet.imageUri,
+                        contentDescription = "Pet photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = pet.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Text(
+                    text = pet.breed,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MetaChip(text = ageLabel)
+                    MetaChip(text = "${formatWeight(pet.weightKg)} kg")
+                    StatusChip(
+                        text = if (pet.vaccinated) "Vaccinated" else "Needs vaccine",
+                        active = pet.vaccinated
+                    )
+                }
+
+                HorizontalDivider(color = colors.outline.copy(alpha = 0.45f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit",
+                            tint = colors.onSurfaceVariant
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = colors.tertiary
+                        )
+                    }
                 }
             }
         }
@@ -405,9 +784,9 @@ private fun MetaChip(text: String) {
     val colors = MaterialTheme.colorScheme
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(14.dp),
         color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.45f))
     ) {
         Text(
             text = text,
@@ -424,20 +803,27 @@ private fun StatusChip(
     active: Boolean
 ) {
     val colors = MaterialTheme.colorScheme
-    val success = Color(0xFF22C55E)
 
     Surface(
-        shape = RoundedCornerShape(12.dp),
-        color = if (active) success.copy(alpha = 0.14f) else colors.tertiary.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(14.dp),
+        color = if (active) {
+            colors.primary.copy(alpha = 0.12f)
+        } else {
+            colors.tertiary.copy(alpha = 0.12f)
+        },
         border = BorderStroke(
             1.dp,
-            if (active) success else colors.tertiary
+            if (active) {
+                colors.primary.copy(alpha = 0.45f)
+            } else {
+                colors.tertiary.copy(alpha = 0.6f)
+            }
         )
     ) {
         Text(
             text = text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            color = if (active) success else colors.tertiary,
+            color = if (active) colors.primary else colors.tertiary,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium
         )
@@ -447,39 +833,101 @@ private fun StatusChip(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AddEditPetSheet(
-    initial: Pet?,
+    initialPet: Pet?,
     onDismiss: () -> Unit,
     onSave: (Pet) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
 
-    var species by rememberSaveable { mutableStateOf(initial?.species ?: Species.DOG) }
-    var name by rememberSaveable { mutableStateOf(initial?.name ?: "") }
-    var breed by rememberSaveable { mutableStateOf(initial?.breed ?: "") }
-    var sex by rememberSaveable { mutableStateOf(initial?.sex ?: "Unknown") }
-    var ageYears by rememberSaveable { mutableIntStateOf(initial?.ageYears ?: 1) }
+    var species by rememberSaveable { mutableStateOf(initialPet?.species ?: Species.DOG) }
+    var name by rememberSaveable { mutableStateOf(initialPet?.name ?: "") }
+    var breed by rememberSaveable { mutableStateOf(initialPet?.breed ?: "") }
+    var sex by rememberSaveable { mutableStateOf(initialPet?.sex ?: "Unknown") }
     var weightText by rememberSaveable {
-        mutableStateOf(initial?.weightKg?.let { formatWeight(it) } ?: "1")
+        mutableStateOf(initialPet?.weightKg?.let { formatWeight(it) } ?: "")
     }
-    var vaccinated by rememberSaveable { mutableStateOf(initial?.vaccinated ?: false) }
-    var imageUri by rememberSaveable { mutableStateOf(initial?.imageUri) }
+    var vaccinated by rememberSaveable { mutableStateOf(initialPet?.vaccinated ?: false) }
+    var imageUri by rememberSaveable { mutableStateOf(initialPet?.imageUri) }
+    var birthDateMillis by rememberSaveable {
+        mutableLongStateOf(initialPet?.birthDateMillis ?: defaultBirthDateMillis())
+    }
+    var showDatePicker by rememberSaveable { mutableStateOf(false) }
 
-    val breedOptions = remember(species) {
+    val breedOptions: List<String> = remember(species) {
         if (species == Species.DOG) DOG_BREEDS else CAT_BREEDS
     }
 
     val scrollState = rememberScrollState()
 
-    val pickImage = rememberLauncherForActivityResult(
+    val imagePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        if (uri != null) imageUri = uri.toString()
+        if (uri != null) {
+            imageUri = uri.toString()
+        }
     }
 
-    val weightValue = weightText.toDoubleOrNull()
-    val canSave = name.trim().isNotEmpty() &&
+    val weightValue: Double? = weightText.toDoubleOrNull()
+    val ageLabel: String = formatPetAge(birthDateMillis)
+    val canSave: Boolean = name.trim().isNotEmpty() &&
             breed.trim().isNotEmpty() &&
-            weightValue != null
+            weightValue != null &&
+            birthDateMillis > 0L
+
+    if (showDatePicker) {
+        val context = LocalContext.current
+
+        LaunchedEffect(showDatePicker) {
+            if (showDatePicker) {
+                val calendar = Calendar.getInstance().apply {
+                    timeInMillis = if (birthDateMillis > 0L) {
+                        birthDateMillis
+                    } else {
+                        System.currentTimeMillis()
+                    }
+                }
+
+                val year = calendar.get(Calendar.YEAR)
+                val month = calendar.get(Calendar.MONTH)
+                val day = calendar.get(Calendar.DAY_OF_MONTH)
+
+                val dialog = android.app.DatePickerDialog(
+                    context,
+                    { _, selectedYear, selectedMonth, selectedDayOfMonth ->
+                        val selectedCalendar = Calendar.getInstance().apply {
+                            set(Calendar.YEAR, selectedYear)
+                            set(Calendar.MONTH, selectedMonth)
+                            set(Calendar.DAY_OF_MONTH, selectedDayOfMonth)
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }
+
+                        val selectedDateMillis = selectedCalendar.timeInMillis
+                        val todayMillis = System.currentTimeMillis()
+
+                        if (selectedDateMillis <= todayMillis) {
+                            birthDateMillis = selectedDateMillis
+                        }
+
+                        showDatePicker = false
+                    },
+                    year,
+                    month,
+                    day
+                )
+
+                dialog.datePicker.maxDate = System.currentTimeMillis()
+
+                dialog.setOnDismissListener {
+                    showDatePicker = false
+                }
+
+                dialog.show()
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -487,35 +935,27 @@ private fun AddEditPetSheet(
             .verticalScroll(scrollState)
             .imePadding()
             .navigationBarsPadding()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        Text(
-            text = if (initial == null) "Add Pet" else "Edit Pet",
-            color = colors.onSurface,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold
+        SheetTopHeader(
+            title = if (initialPet == null) "Add Pet" else "Edit Pet",
+            subtitle = "Set up your pet profile with cleaner and more complete information."
         )
 
-        Spacer(Modifier.height(4.dp))
-
-        Text(
-            text = "Create or update your pet’s profile details.",
-            color = colors.onSurfaceVariant,
-            style = MaterialTheme.typography.bodyMedium
-        )
-
-        Spacer(Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         FormSection(title = "Photo") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Surface(
                     modifier = Modifier
-                        .size(84.dp)
+                        .size(92.dp)
                         .clip(CircleShape)
-                        .clickable { pickImage.launch("image/*") },
+                        .clickable { imagePickerLauncher.launch("image/*") },
                     shape = CircleShape,
                     color = colors.surfaceVariant,
-                    border = BorderStroke(1.dp, colors.outline)
+                    border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.55f))
                 ) {
                     if (imageUri.isNullOrBlank()) {
                         Box(
@@ -523,7 +963,7 @@ private fun AddEditPetSheet(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.CameraAlt,
+                                imageVector = Icons.Default.CameraAlt,
                                 contentDescription = "Pick photo",
                                 tint = colors.onSurfaceVariant
                             )
@@ -538,25 +978,27 @@ private fun AddEditPetSheet(
                     }
                 }
 
-                Spacer(Modifier.width(14.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
-                Column(Modifier.weight(1f)) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "Pet photo",
                         color = colors.onSurface,
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Upload an optional profile image for easier identification.",
+                        text = "Add a clear photo for faster recognition and a better-looking profile.",
                         color = colors.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
 
                     if (!imageUri.isNullOrBlank()) {
-                        Spacer(Modifier.height(6.dp))
-                        TextButton(onClick = { imageUri = null }) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        TextButton(
+                            onClick = { imageUri = null }
+                        ) {
                             Text("Remove photo")
                         }
                     }
@@ -564,7 +1006,7 @@ private fun AddEditPetSheet(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         FormSection(title = "Pet Type") {
             SingleChoiceSegmentedButtonRow(
@@ -574,9 +1016,11 @@ private fun AddEditPetSheet(
                     selected = species == Species.DOG,
                     onClick = {
                         species = Species.DOG
-                        if (breed !in DOG_BREEDS) breed = ""
+                        if (breed !in DOG_BREEDS) {
+                            breed = ""
+                        }
                     },
-                    shape = SegmentedButtonDefaults.itemShape(0, 2)
+                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                 ) {
                     Text("Dog")
                 }
@@ -585,19 +1029,23 @@ private fun AddEditPetSheet(
                     selected = species == Species.CAT,
                     onClick = {
                         species = Species.CAT
-                        if (breed !in CAT_BREEDS) breed = ""
+                        if (breed !in CAT_BREEDS) {
+                            breed = ""
+                        }
                     },
-                    shape = SegmentedButtonDefaults.itemShape(1, 2)
+                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                 ) {
                     Text("Cat")
                 }
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         FormSection(title = "Basic Information") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 StyledField(
                     value = name,
                     onValueChange = { name = it },
@@ -618,14 +1066,16 @@ private fun AddEditPetSheet(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         FormSection(title = "Health Details") {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                AgeStepper(
-                    ageYears = ageYears,
-                    onDecrease = { if (ageYears > 0) ageYears-- },
-                    onIncrease = { if (ageYears < 30) ageYears++ }
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                BirthDatePickerCard(
+                    birthDateMillis = birthDateMillis,
+                    ageLabel = ageLabel,
+                    onClick = { showDatePicker = true }
                 )
 
                 StyledField(
@@ -634,66 +1084,63 @@ private fun AddEditPetSheet(
                     label = "Weight (kg)",
                     keyboardType = KeyboardType.Decimal,
                     isError = weightText.isNotBlank() && weightValue == null,
-                    supportingText = if (weightText.isNotBlank() && weightValue == null)
+                    supportingText = if (weightText.isNotBlank() && weightValue == null) {
                         "Enter a valid number like 3.5"
-                    else null
+                    } else {
+                        null
+                    }
                 )
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = vaccinated,
-                        onCheckedChange = { vaccinated = it }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Column {
-                        Text(
-                            text = "Vaccinated",
-                            color = colors.onSurface,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = "Mark if the pet has basic vaccination coverage.",
-                            color = colors.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                    }
-                }
+                VaccinationRow(
+                    checked = vaccinated,
+                    onCheckedChange = { vaccinated = it }
+                )
             }
         }
 
-        Spacer(Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(18.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            OutlinedButton(
+            TextButton(
                 onClick = onDismiss,
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, colors.outline)
+                modifier = Modifier.weight(1f)
             ) {
                 Text("Cancel")
             }
 
             Button(
                 onClick = {
-                    val pet = (initial ?: Pet()).copy(
-                        species = species,
-                        name = name.trim(),
-                        breed = breed.trim(),
-                        sex = sex,
-                        ageYears = ageYears,
-                        weightKg = weightValue ?: 1.0,
-                        vaccinated = vaccinated,
-                        imageUri = imageUri
-                    )
-                    onSave(pet)
+                    val petToSave: Pet = if (initialPet != null) {
+                        initialPet.copy(
+                            species = species,
+                            name = name.trim(),
+                            breed = breed.trim(),
+                            sex = sex,
+                            birthDateMillis = birthDateMillis,
+                            weightKg = weightValue,
+                            vaccinated = vaccinated,
+                            imageUri = imageUri
+                        )
+                    } else {
+                        Pet(
+                            species = species,
+                            name = name.trim(),
+                            breed = breed.trim(),
+                            sex = sex,
+                            birthDateMillis = birthDateMillis,
+                            weightKg = weightValue,
+                            vaccinated = vaccinated,
+                            imageUri = imageUri
+                        )
+                    }
+                    onSave(petToSave)
                 },
                 enabled = canSave,
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(14.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = colors.primary,
                     contentColor = colors.onPrimary
@@ -703,7 +1150,32 @@ private fun AddEditPetSheet(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun SheetTopHeader(
+    title: String,
+    subtitle: String
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Column(
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = title,
+            color = colors.onSurface,
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            color = colors.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
@@ -715,9 +1187,9 @@ private fun FormSection(
     val colors = MaterialTheme.colorScheme
 
     Surface(
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(22.dp),
         color = colors.surface,
-        border = BorderStroke(1.dp, colors.outline),
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.55f)),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
@@ -730,53 +1202,117 @@ private fun FormSection(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             content()
         }
     }
 }
 
 @Composable
-private fun AgeStepper(
-    ageYears: Int,
-    onDecrease: () -> Unit,
-    onIncrease: () -> Unit
+private fun BirthDatePickerCard(
+    birthDateMillis: Long,
+    ageLabel: String,
+    onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
 
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(18.dp),
         color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.5f))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
+            Surface(
+                shape = CircleShape,
+                color = colors.primary.copy(alpha = 0.12f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Age",
+                    text = "Birth date",
                     style = MaterialTheme.typography.labelLarge,
                     color = colors.onSurface,
                     fontWeight = FontWeight.SemiBold
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "$ageYears year(s)",
+                    text = formatFullDate(birthDateMillis),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "Auto age: $ageLabel",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalIconButton(onClick = onDecrease) {
-                    Text("−", color = colors.onSurface, style = MaterialTheme.typography.titleMedium)
-                }
-                FilledTonalIconButton(onClick = onIncrease) {
-                    Text("+", color = colors.onSurface, style = MaterialTheme.typography.titleMedium)
-                }
+            Text(
+                text = "Change",
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.primary,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+
+@Composable
+private fun VaccinationRow(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = colors.surfaceVariant,
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.5f))
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Checkbox(
+                checked = checked,
+                onCheckedChange = onCheckedChange
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column {
+                Text(
+                    text = "Vaccinated",
+                    color = colors.onSurface,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = "Mark this if the pet already has basic vaccination coverage.",
+                    color = colors.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
     }
@@ -799,11 +1335,20 @@ private fun SexDropdown(
             onValueChange = {},
             readOnly = true,
             label = { Text("Sex") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            trailingIcon = {
+                ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.Wc,
+                    contentDescription = null
+                )
+            },
             modifier = Modifier
                 .menuAnchor()
                 .fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp)
         )
 
         ExposedDropdownMenu(
@@ -844,7 +1389,8 @@ private fun StyledField(
                 Text(supportingText)
             }
         },
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp)
     )
 }
 
@@ -858,16 +1404,21 @@ private fun BreedAutocomplete(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    val filtered = remember(value, options) {
-        val q = value.trim()
-        if (q.isEmpty()) emptyList()
-        else options.filter { it.contains(q, ignoreCase = true) }.take(6)
+    val filteredOptions: List<String> = remember(value, options) {
+        val query: String = value.trim()
+        if (query.isEmpty()) {
+            options.take(6)
+        } else {
+            options.filter { option ->
+                option.contains(query, ignoreCase = true)
+            }.take(6)
+        }
     }
 
     ExposedDropdownMenuBox(
-        expanded = expanded && filtered.isNotEmpty(),
+        expanded = expanded && filteredOptions.isNotEmpty(),
         onExpandedChange = {
-            if (filtered.isNotEmpty()) expanded = !expanded
+            expanded = !expanded
         }
     ) {
         OutlinedTextField(
@@ -880,18 +1431,19 @@ private fun BreedAutocomplete(
             singleLine = true,
             modifier = Modifier
                 .menuAnchor()
-                .fillMaxWidth()
+                .fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp)
         )
 
         ExposedDropdownMenu(
-            expanded = expanded && filtered.isNotEmpty(),
+            expanded = expanded && filteredOptions.isNotEmpty(),
             onDismissRequest = { expanded = false }
         ) {
-            filtered.forEach { item ->
+            filteredOptions.forEach { option ->
                 DropdownMenuItem(
-                    text = { Text(item) },
+                    text = { Text(option) },
                     onClick = {
-                        onValueChange(item)
+                        onValueChange(option)
                         expanded = false
                     }
                 )
@@ -901,10 +1453,66 @@ private fun BreedAutocomplete(
 }
 
 private fun formatWeight(value: Double?): String {
-    val safeValue = value ?: 0.0
+    val safeValue: Double = value ?: 0.0
     return if (safeValue.rem(1.0) == 0.0) {
         safeValue.toInt().toString()
     } else {
         String.format(Locale.US, "%.1f", safeValue)
     }
+}
+
+private fun formatFullDate(value: Long): String {
+    val formatter = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
+    return formatter.format(Date(value))
+}
+
+private fun formatShortDate(value: Long): String {
+    val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
+    return formatter.format(Date(value))
+}
+
+private fun formatPetAge(birthDateMillis: Long): String {
+    val birthCalendar: Calendar = Calendar.getInstance().apply {
+        timeInMillis = birthDateMillis
+    }
+    val todayCalendar: Calendar = Calendar.getInstance()
+
+    var years: Int = todayCalendar.get(Calendar.YEAR) - birthCalendar.get(Calendar.YEAR)
+    var months: Int = todayCalendar.get(Calendar.MONTH) - birthCalendar.get(Calendar.MONTH)
+    val days: Int = todayCalendar.get(Calendar.DAY_OF_MONTH) - birthCalendar.get(Calendar.DAY_OF_MONTH)
+
+    if (days < 0) {
+        months -= 1
+    }
+
+    if (months < 0) {
+        years -= 1
+        months += 12
+    }
+
+    if (years < 0) {
+        years = 0
+    }
+
+    if (years == 0) {
+        return when {
+            months <= 0 -> "0 mo"
+            months == 1 -> "1 mo"
+            else -> "$months mos"
+        }
+    }
+
+    return if (months <= 0) {
+        if (years == 1) "1 yr" else "$years yrs"
+    } else {
+        val yearsText: String = if (years == 1) "1 yr" else "$years yrs"
+        val monthsText: String = if (months == 1) "1 mo" else "$months mos"
+        "$yearsText $monthsText"
+    }
+}
+
+private fun defaultBirthDateMillis(): Long {
+    val calendar: Calendar = Calendar.getInstance()
+    calendar.add(Calendar.YEAR, -1)
+    return calendar.timeInMillis
 }

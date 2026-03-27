@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+}
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -16,7 +25,21 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GEMINI_API_KEY", "\"AIzaSyAGGn310aGgDLH8cgyN7PLecpQueChAdNI\"")
+        buildConfigField(
+            "String",
+            "PHI_API_KEY",
+            "\"${localProperties.getProperty("PHI_API_KEY", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "PHI_BASE_URL",
+            "\"${localProperties.getProperty("PHI_BASE_URL", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "PHI_MODEL",
+            "\"${localProperties.getProperty("PHI_MODEL", "Phi-4-mini-instruct")}\""
+        )
     }
 
     buildFeatures {
@@ -53,6 +76,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.ui.text)
+
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
     implementation(platform(libs.androidx.compose.bom))
@@ -74,8 +100,6 @@ dependencies {
     implementation("com.google.maps.android:maps-compose:4.3.0")
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
-
-    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

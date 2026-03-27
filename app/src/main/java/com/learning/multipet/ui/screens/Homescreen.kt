@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,10 +51,12 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Vaccines
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -111,6 +114,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
+import java.util.Locale
 import kotlin.math.absoluteValue
 import com.learning.multipet.data.LogType as DataLogType
 
@@ -154,7 +159,6 @@ enum class PetEmotion(
     ANXIETY("Anxiety", "🙀", "😬"),
     LOVE("Affection", "😻", "🥰")
 }
-
 
 private fun energyIconResForSpecies(species: Species): Int = when (species) {
     Species.DOG -> R.drawable.ic_energy_dog
@@ -857,7 +861,7 @@ private fun QuickActionsRow(
         PremiumQuickActionCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.AutoAwesome,
-            label = "AI Care",
+            label = "FurSight AI",
             subtitle = "Ask assistant",
             onClick = onAiCare
         )
@@ -960,23 +964,56 @@ private fun ViewToggleButton(
 
     Surface(
         shape = RoundedCornerShape(18.dp),
-        color = colors.surfaceVariant.copy(alpha = 0.55f)
+        color = colors.surfaceVariant,
+        border = BorderStroke(1.dp, colors.outline.copy(alpha = 0.35f))
     ) {
         Row(
             modifier = Modifier.padding(4.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            PremiumToggleChip(
-                selected = current == PetViewMode.LIST,
-                text = "List",
-                onClick = { onChange(PetViewMode.LIST) }
-            )
+            FilledTonalIconButton(
+                onClick = { onChange(PetViewMode.LIST) },
+                modifier = Modifier.size(42.dp),
+                colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (current == PetViewMode.LIST) {
+                        colors.primary.copy(alpha = 0.14f)
+                    } else {
+                        Color.Transparent
+                    },
+                    contentColor = if (current == PetViewMode.LIST) {
+                        colors.primary
+                    } else {
+                        colors.onSurfaceVariant
+                    }
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ViewAgenda,
+                    contentDescription = "List view"
+                )
+            }
 
-            PremiumToggleChip(
-                selected = current == PetViewMode.GRID,
-                text = "Grid",
-                onClick = { onChange(PetViewMode.GRID) }
-            )
+            FilledTonalIconButton(
+                onClick = { onChange(PetViewMode.GRID) },
+                modifier = Modifier.size(42.dp),
+                colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (current == PetViewMode.GRID) {
+                        colors.primary.copy(alpha = 0.14f)
+                    } else {
+                        Color.Transparent
+                    },
+                    contentColor = if (current == PetViewMode.GRID) {
+                        colors.primary
+                    } else {
+                        colors.onSurfaceVariant
+                    }
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.GridView,
+                    contentDescription = "Grid view"
+                )
+            }
         }
     }
 }
@@ -1467,7 +1504,7 @@ private fun FullScreenPetProfile(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(250.dp)
+                                .height(220.dp)
                                 .background(colors.surfaceVariant)
                         ) {
                             if (currentPet.imageUri.isNullOrBlank()) {
@@ -1502,8 +1539,12 @@ private fun FullScreenPetProfile(
                             }
                         }
 
-                        Column(modifier = Modifier.padding(18.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(
+                            modifier = Modifier.padding(18.dp)
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 SmallInfoBadge(text = speciesLabel)
                                 SmallStatusBadge(
                                     text = if (currentPet.vaccinated) "Vaccinated" else "Needs vaccine",
@@ -1531,9 +1572,19 @@ private fun FullScreenPetProfile(
 
                             Spacer(modifier = Modifier.height(14.dp))
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                ProfileMetaChip("Age ${currentPet.ageYears}")
-                                ProfileMetaChip("Weight ${currentPet.weightKg?.let { String.format("%.1f", it) } ?: "—"} kg")
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                ProfileMetaChip("Age ${formatPetAge(currentPet.birthDateMillis)}")
+                                ProfileMetaChip("Born ${formatShortBirthDate(currentPet.birthDateMillis)}")
+                                ProfileMetaChip(
+                                    "Weight ${
+                                        currentPet.weightKg?.let {
+                                            String.format(Locale.US, "%.1f", it)
+                                        } ?: "—"
+                                    } kg"
+                                )
                                 ProfileMetaChip("Sex ${currentPet.sex}")
                             }
 
@@ -1668,7 +1719,6 @@ private fun FullScreenPetProfile(
         }
     }
 }
-
 @Composable
 private fun StatusCheckboxRow(
     label: String,
@@ -2912,6 +2962,55 @@ private fun EmotionSwipeCard(
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant
             )
+        }
+    }
+}
+
+private fun formatShortBirthDate(birthDateMillis: Long): String {
+    val calendar = Calendar.getInstance().apply {
+        timeInMillis = birthDateMillis
+    }
+    val monthNames = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    val month = monthNames[calendar.get(Calendar.MONTH)]
+    val day = calendar.get(Calendar.DAY_OF_MONTH)
+    val year = calendar.get(Calendar.YEAR)
+    return "$month $day, $year"
+}
+
+private fun formatPetAge(birthDateMillis: Long): String {
+    val birthCalendar = Calendar.getInstance().apply {
+        timeInMillis = birthDateMillis
+    }
+    val todayCalendar = Calendar.getInstance()
+
+    var years = todayCalendar.get(Calendar.YEAR) - birthCalendar.get(Calendar.YEAR)
+    var months = todayCalendar.get(Calendar.MONTH) - birthCalendar.get(Calendar.MONTH)
+    val days = todayCalendar.get(Calendar.DAY_OF_MONTH) - birthCalendar.get(Calendar.DAY_OF_MONTH)
+
+    if (days < 0) {
+        months -= 1
+    }
+
+    if (months < 0) {
+        years -= 1
+        months += 12
+    }
+
+    if (years < 0) years = 0
+
+    return if (years == 0) {
+        when {
+            months <= 0 -> "0 mo"
+            months == 1 -> "1 mo"
+            else -> "$months mos"
+        }
+    } else {
+        if (months <= 0) {
+            if (years == 1) "1 yr" else "$years yrs"
+        } else {
+            val yearsText = if (years == 1) "1 yr" else "$years yrs"
+            val monthsText = if (months == 1) "1 mo" else "$months mos"
+            "$yearsText $monthsText"
         }
     }
 }

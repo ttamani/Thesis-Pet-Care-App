@@ -181,7 +181,7 @@ fun AiChatScreen(
                     title = {
                         Column {
                             Text(
-                                text = "AI Pet Care",
+                                text = "FurSight AI",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -787,9 +787,9 @@ private fun PetSelectionCard(
 
             val details = buildString {
                 if (pet.breed.isNotBlank()) append(pet.breed)
-                if (pet.ageYears > 0) {
+                if (pet.birthDateMillis > 0) {
                     if (isNotBlank()) append(" • ")
-                    append("${pet.ageYears}y")
+                    append("${pet.birthDateMillis}y")
                 }
             }
 
