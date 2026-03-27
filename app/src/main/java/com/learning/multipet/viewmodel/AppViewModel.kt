@@ -49,13 +49,20 @@ class AppViewModel(
     fun deletePet(petId: String) = repo.deletePet(petId)
     fun selectPet(petId: String) = repo.selectPet(petId)
 
-    fun addLog(petId: String, date: LocalDate, type: LogType, note: String) {
+    fun addLog(
+        petId: String,
+        date: LocalDate,
+        type: LogType,
+        note: String,
+        createdAtMillis: Long = System.currentTimeMillis()
+    ) {
         repo.addLog(
             LogEntry(
                 petId = petId,
                 date = date,
                 type = type,
-                note = note
+                note = note,
+                createdAtMillis = createdAtMillis
             )
         )
     }
@@ -91,13 +98,13 @@ class AppViewModel(
 
                 val relatedLogs = if (selectedPets.isEmpty()) {
                     currentState.logs
-                        .sortedByDescending { it.date }
+                        .sortedByDescending { it.createdAtMillis }
                         .take(12)
                 } else {
                     val selectedIds = selectedPets.map { it.id }.toSet()
                     currentState.logs
                         .filter { it.petId in selectedIds }
-                        .sortedByDescending { it.date }
+                        .sortedByDescending { it.createdAtMillis }
                         .take(12)
                 }
 

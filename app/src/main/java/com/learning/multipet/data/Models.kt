@@ -28,5 +28,6 @@ data class LogEntry(
     val petId: String,
     val date: LocalDate,
     val type: LogType,
-    val note: String = ""
+    val note: String,
+    val createdAtMillis: Long = System.currentTimeMillis()
 )

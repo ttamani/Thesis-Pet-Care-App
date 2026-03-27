@@ -51,10 +51,18 @@ class Repository {
     }
 
     fun addLog(entry: LogEntry) {
+        val stampedEntry = entry.copy(
+            createdAtMillis = if (entry.createdAtMillis <= 0L) {
+                System.currentTimeMillis()
+            } else {
+                entry.createdAtMillis
+            }
+        )
+
         _state.update { s ->
             s.copy(
-                logs = s.logs + entry,
-                lastActivePetId = entry.petId
+                logs = s.logs + stampedEntry,
+                lastActivePetId = stampedEntry.petId
             )
         }
     }
