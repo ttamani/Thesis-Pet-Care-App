@@ -1,12 +1,27 @@
 package com.learning.multipet.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,7 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -34,18 +49,15 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -62,11 +74,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
@@ -106,7 +121,9 @@ fun AiChatScreen(
 
     LaunchedEffect(messages.size, isAiLoading) {
         val lastIndex = messages.lastIndex
-        if (lastIndex >= 0) listState.animateScrollToItem(lastIndex)
+        if (lastIndex >= 0) {
+            listState.animateScrollToItem(lastIndex + 2)
+        }
     }
 
     LaunchedEffect(pets, state.selectedPetId, state.lastActivePetId) {
@@ -117,7 +134,6 @@ fun AiChatScreen(
                 quickScope = QuickScope.CUSTOM
             }
         }
-
         val validIds = pets.map { it.id }.toSet()
         selectedPetIds = selectedPetIds.filterTo(linkedSetOf()) { it in validIds }
     }
@@ -125,7 +141,11 @@ fun AiChatScreen(
     val selectedPets = pets.filter { it.id in selectedPetIds }
 
     val backgroundBrush = Brush.verticalGradient(
-        colors = listOf(colors.background, colors.surface)
+        colors = listOf(
+            colors.background,
+            colors.surfaceContainerLowest,
+            colors.background
+        )
     )
 
     Box(
@@ -144,24 +164,35 @@ fun AiChatScreen(
                         titleContentColor = colors.onBackground,
                         navigationIconContentColor = colors.onBackground
                     ),
+                    navigationIcon = {
+                        FilledTonalIconButton(
+                            onClick = onBack,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = colors.surface.copy(alpha = 0.92f),
+                                contentColor = colors.onSurface
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                    },
                     title = {
                         Column {
                             Text(
                                 text = "AI Pet Care",
+                                style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "Choose one pet, many pets, or chat in general mode",
-                                color = colors.onSurfaceVariant,
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        FilledTonalIconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back"
+                                text = if (selectedPets.isEmpty()) {
+                                    "General guidance mode"
+                                } else {
+                                    "${selectedPets.size} selected for contextual care guidance"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant
                             )
                         }
                     },
@@ -175,7 +206,6 @@ fun AiChatScreen(
                     onSend = {
                         val userText = input.trim()
                         if (userText.isEmpty()) return@ChatComposer
-
                         vm.sendAiMessage(
                             selectedPetIds = selectedPetIds,
                             userMessage = userText
@@ -189,12 +219,17 @@ fun AiChatScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(padding),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 8.dp,
+                    bottom = 14.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item {
-                    CompactFocusCard(
+                    PremiumFocusCard(
                         pets = pets,
                         selectedPetIds = selectedPetIds,
                         quickScope = quickScope,
@@ -215,11 +250,13 @@ fun AiChatScreen(
                     )
                 }
 
-                item {
-                    SafetyNotice()
+                if (messages.isEmpty()) {
+                    item {
+                        WelcomeCard(selectedPets = selectedPets)
+                    }
                 }
 
-                items(messages) { message ->
+                itemsIndexed(messages) { _, message ->
                     ChatBubble(message = message)
                 }
 
@@ -227,10 +264,6 @@ fun AiChatScreen(
                     item {
                         TypingBubble()
                     }
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -270,7 +303,7 @@ fun AiChatScreen(
 }
 
 @Composable
-private fun CompactFocusCard(
+private fun PremiumFocusCard(
     pets: List<Pet>,
     selectedPetIds: Set<String>,
     quickScope: QuickScope,
@@ -281,25 +314,145 @@ private fun CompactFocusCard(
     val colors = MaterialTheme.colorScheme
     val selectedPets = pets.filter { it.id in selectedPetIds }
 
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = colors.surfaceContainerLow
-        )
+    val focusLabel = when {
+        selectedPets.isEmpty() -> "General"
+        selectedPets.size == 1 -> selectedPets.first().name
+        selectedPets.size <= 3 -> selectedPets.joinToString { it.name }
+        else -> "${selectedPets.take(2).joinToString { it.name }} +${selectedPets.size - 2}"
+    }
+
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(animationSpec = tween(220)) + expandVertically(animationSpec = tween(260)),
+        exit = fadeOut(animationSpec = tween(180)) + shrinkVertically(animationSpec = tween(220))
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+            shape = RoundedCornerShape(26.dp),
+            color = colors.surface.copy(alpha = 0.96f),
+            tonalElevation = 3.dp,
+            shadowElevation = 3.dp,
+            border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = "Conversation Focus",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        AnimatedContent(
+                            targetState = focusLabel,
+                            label = "focus_label"
+                        ) { label ->
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    FilledTonalIconButton(
+                        onClick = onOpenPicker
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = "Choose pets"
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                QuickScopeRow(
+                    selectedScope = quickScope,
+                    onScopeSelected = onScopeSelected,
+                    onClear = onClear
+                )
+
+                Row(
+                    modifier = Modifier.padding(top = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val iconAlpha by animateFloatAsState(
+                        targetValue = 0.82f,
+                        animationSpec = tween(240),
+                        label = "focus_safety_alpha"
+                    )
+
+                    Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = colors.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(14.dp)
+                            .alpha(iconAlpha)
+                    )
+
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    Text(
+                        text = "General pet-care guidance only",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WelcomeCard(
+    selectedPets: List<Pet>
+) {
+    val colors = MaterialTheme.colorScheme
+
+    val welcomeText = when {
+        selectedPets.isEmpty() -> "Ask about appetite, stool, energy, vaccines, or daily care."
+        selectedPets.size == 1 -> "You’re now focused on ${selectedPets.first().name} for more contextual guidance."
+        else -> "You’re now focused on multiple pets for broader care guidance."
+    }
+
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(animationSpec = tween(220)) + expandVertically(animationSpec = tween(260)),
+        exit = fadeOut(animationSpec = tween(180)) + shrinkVertically(animationSpec = tween(220))
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+            shape = RoundedCornerShape(24.dp),
+            color = colors.primaryContainer.copy(alpha = 0.42f),
+            border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.10f))
         ) {
             Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Surface(
-                    shape = RoundedCornerShape(14.dp),
-                    color = colors.primary.copy(alpha = 0.12f)
+                    shape = RoundedCornerShape(16.dp),
+                    color = colors.primary.copy(alpha = 0.10f)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Pets,
+                        imageVector = Icons.Default.AutoAwesome,
                         contentDescription = null,
                         tint = colors.primary,
                         modifier = Modifier.padding(10.dp)
@@ -308,118 +461,24 @@ private fun CompactFocusCard(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
+                Column {
                     Text(
-                        text = "Conversation Focus",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = colors.onSurface,
-                        fontWeight = FontWeight.SemiBold
+                        text = "AI Care Assistant",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.onSurface
                     )
-                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
                     Text(
-                        text = "Keep chat focused without cluttering the screen.",
+                        text = welcomeText,
                         style = MaterialTheme.typography.bodySmall,
                         color = colors.onSurfaceVariant
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            QuickScopeRow(
-                selectedScope = quickScope,
-                onScopeSelected = onScopeSelected,
-                onClear = onClear
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            FocusSummaryCompact(
-                selectedPets = selectedPets
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                FilledTonalButton(
-                    onClick = onOpenPicker,
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tune,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Choose Pets")
-                }
-            }
         }
-    }
-}
-
-@Composable
-private fun FocusSummaryCompact(
-    selectedPets: List<Pet>
-) {
-    val colors = MaterialTheme.colorScheme
-
-    val summary = when {
-        selectedPets.isEmpty() -> "General mode: no pets selected"
-        selectedPets.size == 1 -> "Focused on ${selectedPets.first().name}"
-        selectedPets.size <= 3 -> "Focused on ${selectedPets.joinToString { it.name }}"
-        else -> {
-            val firstThree = selectedPets.take(3).joinToString { it.name }
-            "Focused on $firstThree, +${selectedPets.size - 3} more"
-        }
-    }
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        color = colors.secondaryContainer
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
-        ) {
-            Text(
-                text = summary,
-                color = colors.onSecondaryContainer,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-
-            if (selectedPets.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    selectedPets.take(6).forEach { pet ->
-                        SelectedPetChip(name = pet.name)
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SelectedPetChip(name: String) {
-    val colors = MaterialTheme.colorScheme
-
-    Surface(
-        shape = RoundedCornerShape(100.dp),
-        color = colors.surface.copy(alpha = 0.65f)
-    ) {
-        Text(
-            text = name,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            color = colors.onSurface,
-            style = MaterialTheme.typography.labelMedium
-        )
     }
 }
 
@@ -526,39 +585,28 @@ private fun QuickScopeRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        FilterChip(
+        FocusChip(
+            text = "All",
             selected = selectedScope == QuickScope.ALL_PETS,
-            onClick = { onScopeSelected(QuickScope.ALL_PETS) },
-            label = { Text("All Pets") },
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = colors.primary.copy(alpha = 0.15f),
-                selectedLabelColor = colors.primary
-            )
+            onClick = { onScopeSelected(QuickScope.ALL_PETS) }
         )
 
-        FilterChip(
+        FocusChip(
+            text = "Cats",
             selected = selectedScope == QuickScope.CATS,
-            onClick = { onScopeSelected(QuickScope.CATS) },
-            label = { Text("Cats") },
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = colors.primary.copy(alpha = 0.15f),
-                selectedLabelColor = colors.primary
-            )
+            onClick = { onScopeSelected(QuickScope.CATS) }
         )
 
-        FilterChip(
+        FocusChip(
+            text = "Dogs",
             selected = selectedScope == QuickScope.DOGS,
-            onClick = { onScopeSelected(QuickScope.DOGS) },
-            label = { Text("Dogs") },
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = colors.primary.copy(alpha = 0.15f),
-                selectedLabelColor = colors.primary
-            )
+            onClick = { onScopeSelected(QuickScope.DOGS) }
         )
 
         Surface(
             shape = RoundedCornerShape(100.dp),
             color = colors.surfaceContainerHigh,
+            border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)),
             modifier = Modifier.clickable(onClick = onClear)
         ) {
             Row(
@@ -571,7 +619,9 @@ private fun QuickScopeRow(
                     tint = colors.onSurfaceVariant,
                     modifier = Modifier.size(16.dp)
                 )
+
                 Spacer(modifier = Modifier.width(6.dp))
+
                 Text(
                     text = "Clear",
                     color = colors.onSurfaceVariant,
@@ -583,12 +633,80 @@ private fun QuickScopeRow(
 }
 
 @Composable
+private fun FocusChip(
+    text: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "focus_chip_scale"
+    )
+
+    val tonalElevation by animateDpAsState(
+        targetValue = if (selected) 2.dp else 0.dp,
+        animationSpec = tween(180),
+        label = "focus_chip_elevation"
+    )
+
+    val borderWidth by animateDpAsState(
+        targetValue = if (selected) 1.5.dp else 1.dp,
+        animationSpec = tween(180),
+        label = "focus_chip_border_width"
+    )
+
+    Surface(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        shape = RoundedCornerShape(100.dp),
+        color = if (selected) {
+            colors.primary.copy(alpha = 0.12f)
+        } else {
+            colors.surfaceContainerLow
+        },
+        border = BorderStroke(
+            borderWidth,
+            if (selected) colors.primary.copy(alpha = 0.22f) else colors.outlineVariant.copy(alpha = 0.55f)
+        ),
+        tonalElevation = tonalElevation,
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) colors.primary else colors.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium
+        )
+    }
+}
+
+@Composable
 private fun PetSelectionCard(
     pet: Pet,
     selected: Boolean,
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.98f else 1f,
+        animationSpec = tween(120),
+        label = "pet_picker_scale"
+    )
 
     val containerColor = if (selected) colors.primaryContainer else colors.surface
     val borderColor = if (selected) colors.primary else colors.outlineVariant
@@ -596,9 +714,14 @@ private fun PetSelectionCard(
     val subtitleColor = if (selected) colors.onPrimaryContainer.copy(alpha = 0.8f) else colors.onSurfaceVariant
 
     Surface(
+        onClick = onClick,
+        interactionSource = interactionSource,
         modifier = Modifier
             .width(150.dp)
-            .clickable(onClick = onClick),
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            },
         shape = RoundedCornerShape(20.dp),
         color = containerColor,
         border = BorderStroke(if (selected) 2.dp else 1.dp, borderColor),
@@ -700,62 +823,64 @@ private fun EmptyPetState() {
 }
 
 @Composable
-private fun SafetyNotice() {
-    val colors = MaterialTheme.colorScheme
-
-    Surface(
-        shape = RoundedCornerShape(16.dp),
-        color = colors.tertiaryContainer,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Default.AutoAwesome,
-                contentDescription = null,
-                tint = colors.onTertiaryContainer
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Text(
-                text = "Safety: No diagnosis, no medication dosing, and no human medicine advice.",
-                color = colors.onTertiaryContainer,
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
 private fun ChatBubble(
     message: ChatMessage
 ) {
     val colors = MaterialTheme.colorScheme
     val isUser = message.role == ChatRole.USER
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(animationSpec = tween(180)) + expandVertically(animationSpec = tween(220)),
+        exit = fadeOut(animationSpec = tween(120))
     ) {
-        Surface(
-            shape = RoundedCornerShape(
-                topStart = 18.dp,
-                topEnd = 18.dp,
-                bottomStart = if (isUser) 18.dp else 6.dp,
-                bottomEnd = if (isUser) 6.dp else 18.dp
-            ),
-            color = if (isUser) colors.primary else colors.surfaceContainerHigh
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+            horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
         ) {
-            Text(
-                text = message.text,
-                color = if (isUser) colors.onPrimary else colors.onSurface,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
-            )
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (!isUser) {
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = colors.primary.copy(alpha = 0.10f),
+                        border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.08f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = colors.primary,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .padding(7.dp)
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(
+                        topStart = 22.dp,
+                        topEnd = 22.dp,
+                        bottomStart = if (isUser) 22.dp else 8.dp,
+                        bottomEnd = if (isUser) 8.dp else 22.dp
+                    ),
+                    color = if (isUser) colors.primary else colors.surface.copy(alpha = 0.96f),
+                    border = if (isUser) null else BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)),
+                    tonalElevation = if (isUser) 0.dp else 1.dp,
+                    shadowElevation = 0.dp
+                ) {
+                    Text(
+                        text = message.text,
+                        color = if (isUser) colors.onPrimary else colors.onSurface,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -768,21 +893,42 @@ private fun TypingBubble() {
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.Start
     ) {
-        Surface(
-            shape = RoundedCornerShape(
-                topStart = 18.dp,
-                topEnd = 18.dp,
-                bottomStart = 6.dp,
-                bottomEnd = 18.dp
-            ),
-            color = colors.surfaceContainerHigh
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = "AI is typing...",
-                color = colors.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
-            )
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = colors.primary.copy(alpha = 0.10f),
+                border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.08f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .padding(7.dp)
+                )
+            }
+
+            Surface(
+                shape = RoundedCornerShape(
+                    topStart = 22.dp,
+                    topEnd = 22.dp,
+                    bottomStart = 8.dp,
+                    bottomEnd = 22.dp
+                ),
+                color = colors.surface.copy(alpha = 0.96f),
+                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f))
+            ) {
+                Text(
+                    text = "AI is typing…",
+                    color = colors.onSurfaceVariant,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)
+                )
+            }
         }
     }
 }
@@ -794,10 +940,13 @@ private fun ChatComposer(
     onSend: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val canSend = value.trim().isNotEmpty()
 
     Surface(
-        color = colors.surface,
-        tonalElevation = 0.dp
+        color = colors.surface.copy(alpha = 0.96f),
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
         Column(
             modifier = Modifier
@@ -806,7 +955,7 @@ private fun ChatComposer(
                 .imePadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            HorizontalDivider(color = colors.outlineVariant)
+            HorizontalDivider(color = colors.outlineVariant.copy(alpha = 0.55f))
 
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -824,31 +973,31 @@ private fun ChatComposer(
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences
                     ),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = colors.onSurface,
                         unfocusedTextColor = colors.onSurface,
-                        disabledTextColor = colors.onSurfaceVariant,
                         cursorColor = colors.primary,
-                        focusedBorderColor = colors.primary,
-                        unfocusedBorderColor = colors.outline,
-                        focusedContainerColor = colors.surface,
-                        unfocusedContainerColor = colors.surface,
+                        focusedBorderColor = colors.primary.copy(alpha = 0.85f),
+                        unfocusedBorderColor = colors.outlineVariant.copy(alpha = 0.75f),
+                        focusedContainerColor = colors.surfaceContainerLowest,
+                        unfocusedContainerColor = colors.surfaceContainerLowest,
                         focusedPlaceholderColor = colors.onSurfaceVariant,
-                        unfocusedPlaceholderColor = colors.onSurfaceVariant,
-                        focusedLabelColor = colors.primary,
-                        unfocusedLabelColor = colors.onSurfaceVariant
+                        unfocusedPlaceholderColor = colors.onSurfaceVariant
                     )
                 )
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                Button(
+                FilledIconButton(
                     onClick = onSend,
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
+                    enabled = canSend,
+                    modifier = Modifier.size(54.dp),
+                    colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = colors.primary,
-                        contentColor = colors.onPrimary
+                        contentColor = colors.onPrimary,
+                        disabledContainerColor = colors.surfaceContainerHigh,
+                        disabledContentColor = colors.onSurfaceVariant
                     )
                 ) {
                     Icon(

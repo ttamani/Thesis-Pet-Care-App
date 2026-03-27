@@ -4,8 +4,13 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -55,6 +60,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,7 +69,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -220,8 +228,15 @@ private fun LoadingTransitionScreen(
     onFinished: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
+    val backgroundBrush = Brush.verticalGradient(
+        colors = listOf(
+            colors.background,
+            colors.surfaceContainerLowest,
+            colors.background
+        )
+    )
 
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         delay(1100)
         onFinished()
     }
@@ -229,7 +244,7 @@ private fun LoadingTransitionScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background),
+            .background(backgroundBrush),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -237,10 +252,11 @@ private fun LoadingTransitionScreen(
         ) {
             Surface(
                 shape = CircleShape,
-                color = colors.primary.copy(alpha = 0.12f)
+                color = colors.primary.copy(alpha = 0.10f),
+                border = BorderStroke(1.dp, colors.primary.copy(alpha = 0.10f))
             ) {
                 Box(
-                    modifier = Modifier.size(86.dp),
+                    modifier = Modifier.size(92.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
@@ -282,6 +298,7 @@ private fun DashboardScaffold(
     val state by vm.state.collectAsState()
     val currentTheme = themeVm.themePreference.collectAsState().value
     val colors = MaterialTheme.colorScheme
+
     var homePetViewMode by rememberSaveable { mutableStateOf(PetViewMode.LIST) }
     var tab by rememberSaveable { mutableStateOf(BottomTab.Home) }
     var route by rememberSaveable { mutableStateOf(DashboardRoute.Main) }
@@ -403,60 +420,66 @@ private fun AppTopBar(
 ) {
     val colors = MaterialTheme.colorScheme
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(colors.background)
-            .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = colors.background.copy(alpha = 0.98f)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = title,
-                    color = colors.onBackground,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    color = colors.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Top
             ) {
-                Box {
-                    TopBarIconButton(
-                        icon = Icons.Filled.NotificationsNone,
-                        contentDescription = "Notifications",
-                        badgeCount = notificationCount,
-                        onClick = onNotificationsClick
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = title,
+                        color = colors.onBackground,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
                     )
 
-                    NotificationPopup(
-                        expanded = showNotifications,
-                        attentionCount = attentionCount,
-                        vaccinesDue = vaccinesDue,
-                        onDismiss = onDismissNotifications
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        text = subtitle,
+                        color = colors.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
 
-                TopBarIconButton(
-                    icon = Icons.Filled.Person,
-                    contentDescription = "Profile",
-                    onClick = onProfileClick
-                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Box {
+                        TopBarIconButton(
+                            icon = Icons.Filled.NotificationsNone,
+                            contentDescription = "Notifications",
+                            badgeCount = notificationCount,
+                            onClick = onNotificationsClick
+                        )
+
+                        NotificationPopup(
+                            expanded = showNotifications,
+                            attentionCount = attentionCount,
+                            vaccinesDue = vaccinesDue,
+                            onDismiss = onDismissNotifications
+                        )
+                    }
+
+                    TopBarIconButton(
+                        icon = Icons.Filled.Person,
+                        contentDescription = "Profile",
+                        onClick = onProfileClick
+                    )
+                }
             }
         }
     }
@@ -470,15 +493,32 @@ private fun TopBarIconButton(
     badgeCount: Int = 0
 ) {
     val colors = MaterialTheme.colorScheme
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "top_bar_icon_scale"
+    )
 
     Surface(
         onClick = onClick,
+        interactionSource = interactionSource,
         shape = CircleShape,
         color = colors.surface,
-        border = BorderStroke(1.dp, colors.outline)
+        tonalElevation = 1.dp,
+        shadowElevation = 1.dp,
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f)),
+        modifier = Modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
     ) {
         Box(
-            modifier = Modifier.size(40.dp),
+            modifier = Modifier.size(42.dp),
             contentAlignment = Alignment.Center
         ) {
             if (badgeCount > 0) {
@@ -601,7 +641,7 @@ private fun NotificationPopupItem(
     Surface(
         shape = RoundedCornerShape(14.dp),
         color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.40f))
     ) {
         Column(
             modifier = Modifier
@@ -656,8 +696,10 @@ private fun AppBottomBar(
     val colors = MaterialTheme.colorScheme
 
     Surface(
-        color = colors.surfaceVariant,
-        border = BorderStroke(1.dp, colors.outline)
+        color = colors.surface.copy(alpha = 0.98f),
+        tonalElevation = 2.dp,
+        shadowElevation = 6.dp,
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.40f))
     ) {
         NavigationBar(
             modifier = Modifier.navigationBarsPadding(),
@@ -686,7 +728,7 @@ private fun AppBottomBar(
                         selectedTextColor = colors.primary,
                         unselectedIconColor = colors.onSurfaceVariant,
                         unselectedTextColor = colors.onSurfaceVariant,
-                        indicatorColor = colors.primary.copy(alpha = 0.14f)
+                        indicatorColor = colors.primary.copy(alpha = 0.12f)
                     )
                 )
             }
@@ -730,10 +772,12 @@ private fun ProfileScreen(
                     onClick = onBack,
                     shape = CircleShape,
                     color = colors.surface,
-                    border = BorderStroke(1.dp, colors.outline)
+                    tonalElevation = 1.dp,
+                    shadowElevation = 1.dp,
+                    border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f))
                 ) {
                     Box(
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier.size(42.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -773,7 +817,9 @@ private fun ProfileScreen(
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = colors.surface,
-                border = BorderStroke(1.dp, colors.outline)
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.35f))
             ) {
                 Column(
                     modifier = Modifier
@@ -784,7 +830,7 @@ private fun ProfileScreen(
                     Surface(
                         shape = CircleShape,
                         color = colors.surfaceVariant,
-                        border = BorderStroke(1.dp, colors.outline)
+                        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.35f))
                     ) {
                         Box(
                             modifier = Modifier.size(76.dp),
@@ -822,7 +868,9 @@ private fun ProfileScreen(
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = colors.surface,
-                border = BorderStroke(1.dp, colors.outline)
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.35f))
             ) {
                 Column(
                     modifier = Modifier
@@ -843,7 +891,8 @@ private fun ProfileScreen(
                         onValueChange = { editedName = it },
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Display Name") },
-                        singleLine = true
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp)
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -854,7 +903,8 @@ private fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Signed-in Account") },
                         enabled = false,
-                        singleLine = true
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp)
                     )
                 }
             }
@@ -864,7 +914,9 @@ private fun ProfileScreen(
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = colors.surface,
-                border = BorderStroke(1.dp, colors.outline)
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.35f))
             ) {
                 Column(
                     modifier = Modifier
@@ -935,7 +987,9 @@ private fun ProfileScreen(
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = colors.surface,
-                border = BorderStroke(1.dp, colors.outline)
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.35f))
             ) {
                 Column(
                     modifier = Modifier
@@ -991,7 +1045,9 @@ private fun ProfileScreen(
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = colors.surface,
-                border = BorderStroke(1.dp, colors.outline)
+                tonalElevation = 2.dp,
+                shadowElevation = 2.dp,
+                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.35f))
             ) {
                 Column(
                     modifier = Modifier
@@ -1021,7 +1077,7 @@ private fun ProfileScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    HorizontalDivider(color = colors.outline)
+                    HorizontalDivider(color = colors.outlineVariant)
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -1029,7 +1085,7 @@ private fun ProfileScreen(
                         onClick = onSignOut,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(1.dp, colors.outline)
+                        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.45f))
                     ) {
                         Text("Sign Out")
                     }
@@ -1083,7 +1139,7 @@ private fun PreferenceToggleRow(
                 checkedTrackColor = colors.primary,
                 uncheckedThumbColor = colors.onSurfaceVariant,
                 uncheckedTrackColor = colors.surfaceVariant,
-                uncheckedBorderColor = colors.outline
+                uncheckedBorderColor = colors.outlineVariant
             )
         )
     }
@@ -1092,6 +1148,6 @@ private fun PreferenceToggleRow(
 @Composable
 private fun PreferenceDivider() {
     HorizontalDivider(
-        color = MaterialTheme.colorScheme.outline
+        color = MaterialTheme.colorScheme.outlineVariant
     )
 }

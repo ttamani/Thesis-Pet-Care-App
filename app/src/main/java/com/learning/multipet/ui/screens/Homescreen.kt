@@ -4,6 +4,7 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -21,7 +22,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -50,10 +50,8 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Pets
-import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Vaccines
 import androidx.compose.material3.AlertDialog
@@ -73,8 +71,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
@@ -93,6 +89,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -110,7 +107,11 @@ import com.learning.multipet.data.LogEntry
 import com.learning.multipet.data.Pet
 import com.learning.multipet.data.Species
 import com.learning.multipet.viewmodel.AppViewModel
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlin.math.absoluteValue
 import com.learning.multipet.data.LogType as DataLogType
 
 enum class ProfileQuickLogType { Appetite, Stool, Energy, Weight, VaccineDeworm }
@@ -132,17 +133,14 @@ enum class QuickLogCategory {
     VACCINE
 }
 
-enum class StoolLevel(
-    val label: String,
-    val emoji: String
-) {
-    NORMAL("Normal", "✅"),
-    SOFT("Soft", "🟡"),
-    LOOSE("Loose", "🟠"),
-    DIARRHEA("Diarrhea", "🚨"),
-    HARD("Hard", "🪨"),
-    BLOOD_PRESENT("Blood Present", "🩸"),
-    MUCUS_PRESENT("Mucus Present", "⚠️")
+enum class StoolLevel(val label: String) {
+    NORMAL("Normal"),
+    SOFT("Soft"),
+    LOOSE("Loose"),
+    DIARRHEA("Diarrhea"),
+    HARD("Hard"),
+    BLOOD_PRESENT("Blood present"),
+    MUCUS_PRESENT("Mucus present")
 }
 
 enum class PetEmotion(
@@ -155,6 +153,60 @@ enum class PetEmotion(
     ANGER("Anger", "😾", "😠"),
     ANXIETY("Anxiety", "🙀", "😬"),
     LOVE("Affection", "😻", "🥰")
+}
+
+
+private fun energyIconResForSpecies(species: Species): Int = when (species) {
+    Species.DOG -> R.drawable.ic_energy_dog
+    Species.CAT -> R.drawable.ic_energy_cat
+}
+
+private fun appetiteIconFromNote(note: String): Int {
+    val value = note.lowercase()
+    return when {
+        "very poor" in value -> R.drawable.ic_appetite_very_poor
+        "very good" in value -> R.drawable.ic_appetite_very_good
+        "low" in value -> R.drawable.ic_appetite_low
+        "good" in value -> R.drawable.ic_appetite_good
+        "normal" in value -> R.drawable.ic_appetite_normal
+        else -> R.drawable.ic_appetite_normal
+    }
+}
+
+private fun stoolIconFromNote(note: String): Int {
+    val value = note.lowercase()
+    return when {
+        "blood" in value -> R.drawable.ic_stool_blood
+        "mucus" in value -> R.drawable.ic_stool_mucus
+        "diarrhea" in value -> R.drawable.ic_stool_diarrhea
+        "loose" in value -> R.drawable.ic_stool_loose
+        "soft" in value -> R.drawable.ic_stool_soft
+        "hard" in value -> R.drawable.ic_stool_hard
+        "normal" in value -> R.drawable.ic_stool_normal
+        else -> R.drawable.ic_stool_normal
+    }
+}
+
+private fun energyEmotionIconFromNote(note: String, species: Species): Int {
+    val value = note.lowercase()
+    return when (species) {
+        Species.CAT -> when {
+            "joy" in value -> R.drawable.cat_joy
+            "fear" in value || "sad" in value -> R.drawable.cat_sad
+            "anger" in value -> R.drawable.cat_anger
+            "anxiety" in value -> R.drawable.cat_anxiety
+            "love" in value || "affection" in value -> R.drawable.cat_love
+            else -> energyIconResForSpecies(species)
+        }
+        Species.DOG -> when {
+            "joy" in value -> R.drawable.dog_joy
+            "fear" in value || "sad" in value -> R.drawable.dog_sad
+            "anger" in value -> R.drawable.dog_anger
+            "anxiety" in value -> R.drawable.dog_anxiety
+            "love" in value || "affection" in value -> R.drawable.dog_love
+            else -> energyIconResForSpecies(species)
+        }
+    }
 }
 
 enum class AppetiteLevel(
@@ -178,6 +230,20 @@ private data class EmotionUiModel(
     val title: String,
     val description: String,
     val accent: Color
+)
+
+private data class AppetiteUiModel(
+    val level: AppetiteLevel,
+    val title: String,
+    val subtitle: String,
+    @DrawableRes val iconRes: Int
+)
+
+private data class StoolUiModel(
+    val level: StoolLevel,
+    val title: String,
+    val subtitle: String,
+    @DrawableRes val iconRes: Int
 )
 
 private fun emotionUiModel(emotion: PetEmotion): EmotionUiModel = when (emotion) {
@@ -213,6 +279,84 @@ private fun emotionUiModel(emotion: PetEmotion): EmotionUiModel = when (emotion)
     )
 }
 
+private fun appetiteUiModel(level: AppetiteLevel): AppetiteUiModel = when (level) {
+    AppetiteLevel.VERY_POOR -> AppetiteUiModel(
+        level = level,
+        title = "Very poor",
+        subtitle = "Barely ate or refused food",
+        iconRes = R.drawable.ic_appetite_very_poor
+    )
+    AppetiteLevel.LOW -> AppetiteUiModel(
+        level = level,
+        title = "Low",
+        subtitle = "Ate only a small amount",
+        iconRes = R.drawable.ic_appetite_low
+    )
+    AppetiteLevel.NORMAL -> AppetiteUiModel(
+        level = level,
+        title = "Normal",
+        subtitle = "Usual appetite today",
+        iconRes = R.drawable.ic_appetite_normal
+    )
+    AppetiteLevel.GOOD -> AppetiteUiModel(
+        level = level,
+        title = "Good",
+        subtitle = "Ate well without concern",
+        iconRes = R.drawable.ic_appetite_good
+    )
+    AppetiteLevel.VERY_GOOD -> AppetiteUiModel(
+        level = level,
+        title = "Very good",
+        subtitle = "Strong appetite today",
+        iconRes = R.drawable.ic_appetite_very_good
+    )
+}
+
+private fun stoolUiModel(level: StoolLevel): StoolUiModel = when (level) {
+    StoolLevel.NORMAL -> StoolUiModel(
+        level = level,
+        title = "Normal",
+        subtitle = "Healthy and expected",
+        iconRes = R.drawable.ic_stool_normal
+    )
+    StoolLevel.SOFT -> StoolUiModel(
+        level = level,
+        title = "Soft",
+        subtitle = "Softer than usual",
+        iconRes = R.drawable.ic_stool_soft
+    )
+    StoolLevel.LOOSE -> StoolUiModel(
+        level = level,
+        title = "Loose",
+        subtitle = "Less formed than normal",
+        iconRes = R.drawable.ic_stool_loose
+    )
+    StoolLevel.DIARRHEA -> StoolUiModel(
+        level = level,
+        title = "Diarrhea",
+        subtitle = "Watery or frequent stool",
+        iconRes = R.drawable.ic_stool_diarrhea
+    )
+    StoolLevel.HARD -> StoolUiModel(
+        level = level,
+        title = "Hard",
+        subtitle = "Dry or difficult to pass",
+        iconRes = R.drawable.ic_stool_hard
+    )
+    StoolLevel.BLOOD_PRESENT -> StoolUiModel(
+        level = level,
+        title = "Blood present",
+        subtitle = "Visible blood noticed",
+        iconRes = R.drawable.ic_stool_blood
+    )
+    StoolLevel.MUCUS_PRESENT -> StoolUiModel(
+        level = level,
+        title = "Mucus present",
+        subtitle = "Visible mucus noticed",
+        iconRes = R.drawable.ic_stool_mucus
+    )
+}
+
 @Composable
 fun HomeScreen(
     vm: AppViewModel,
@@ -225,6 +369,13 @@ fun HomeScreen(
 ) {
     val state by vm.state.collectAsState()
     val colors = MaterialTheme.colorScheme
+    val backgroundBrush = Brush.verticalGradient(
+        colors = listOf(
+            colors.background,
+            colors.surfaceContainerLowest,
+            colors.background
+        )
+    )
 
     var selectedFilter by remember { mutableStateOf(PetFilter.ALL) }
     var selectedPet by remember { mutableStateOf<Pet?>(null) }
@@ -268,134 +419,139 @@ fun HomeScreen(
 
     val gridRows = remember(filteredPets) { filteredPets.chunked(2) }
 
-    Scaffold(
-        containerColor = colors.background
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(colors.background)
-                .padding(innerPadding),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = 16.dp,
-                bottom = 24.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            item {
-                DashboardOverviewCard(
-                    petCount = state.pets.size,
-                    attentionNeeded = attentionNeeded,
-                    dueVaccines = vaccinesDue
-                )
-            }
-
-            item {
-                QuickActionsRow(
-                    onRecords = onOpenCalendar,
-                    onFindVet = onFindVet,
-                    onAiCare = onOpenAi
-                )
-            }
-
-            item {
-                PremiumSectionShell {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Pets",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = colors.onSurface,
-                                fontWeight = FontWeight.SemiBold
-                            )
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            Text(
-                                text = "${filteredPets.size} visible",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = colors.onSurfaceVariant
-                            )
-                        }
-
-                        ViewToggleButton(
-                            current = viewMode,
-                            onChange = onViewModeChange
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        TextButton(onClick = onGoManage) {
-                            Text("Manage")
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    PetFilterChips(
-                        selected = selectedFilter,
-                        onSelected = { selectedFilter = it }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(backgroundBrush)
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = 16.dp,
+                    bottom = 24.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item {
+                    DashboardOverviewCard(
+                        petCount = state.pets.size,
+                        attentionNeeded = attentionNeeded,
+                        dueVaccines = vaccinesDue
                     )
                 }
-            }
 
-            when {
-                state.pets.isEmpty() -> {
-                    item {
-                        HomeEmptyStateCard(
-                            title = "No pets added yet",
-                            subtitle = "Add your first dog or cat to begin tracking care and logs.",
-                            onGoManage = onGoManage
-                        )
-                    }
+                item {
+                    QuickActionsRow(
+                        onRecords = onOpenCalendar,
+                        onFindVet = onFindVet,
+                        onAiCare = onOpenAi
+                    )
                 }
 
-                filteredPets.isEmpty() -> {
-                    item {
-                        HomeEmptyStateCard(
-                            title = "No matching pets",
-                            subtitle = "Try another filter to view more pets.",
-                            onGoManage = null
-                        )
-                    }
-                }
-
-                viewMode == PetViewMode.LIST -> {
-                    items(filteredPets, key = { it.id }) { pet ->
-                        ModernPetListCard(
-                            pet = pet,
-                            onClick = {
-                                vm.selectPet(pet.id)
-                                selectedPet = pet
-                            }
-                        )
-                    }
-                }
-
-                else -> {
-                    items(gridRows) { rowPets ->
+                item {
+                    PremiumSectionShell {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            rowPets.forEach { pet ->
-                                ModernPetGridCard(
-                                    pet = pet,
-                                    onClick = {
-                                        vm.selectPet(pet.id)
-                                        selectedPet = pet
-                                    },
-                                    modifier = Modifier.weight(1f)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Pets",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = colors.onSurface,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+
+                                Spacer(modifier = Modifier.height(2.dp))
+
+                                Text(
+                                    text = "${filteredPets.size} visible",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = colors.onSurfaceVariant
                                 )
                             }
 
-                            if (rowPets.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
+                            ViewToggleButton(
+                                current = viewMode,
+                                onChange = onViewModeChange
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            TextButton(onClick = onGoManage) {
+                                Text("Manage")
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        PetFilterChips(
+                            selected = selectedFilter,
+                            onSelected = { selectedFilter = it }
+                        )
+                    }
+                }
+
+                when {
+                    state.pets.isEmpty() -> {
+                        item {
+                            HomeEmptyStateCard(
+                                title = "No pets added yet",
+                                subtitle = "Add your first dog or cat to begin tracking care and logs.",
+                                onGoManage = onGoManage
+                            )
+                        }
+                    }
+
+                    filteredPets.isEmpty() -> {
+                        item {
+                            HomeEmptyStateCard(
+                                title = "No matching pets",
+                                subtitle = "Try another filter to view more pets.",
+                                onGoManage = null
+                            )
+                        }
+                    }
+
+                    viewMode == PetViewMode.LIST -> {
+                        items(filteredPets, key = { it.id }) { pet ->
+                            ModernPetListCard(
+                                pet = pet,
+                                onClick = {
+                                    vm.selectPet(pet.id)
+                                    selectedPet = pet
+                                }
+                            )
+                        }
+                    }
+
+                    else -> {
+                        items(gridRows) { rowPets ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                rowPets.forEach { pet ->
+                                    ModernPetGridCard(
+                                        pet = pet,
+                                        onClick = {
+                                            vm.selectPet(pet.id)
+                                            selectedPet = pet
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+
+                                if (rowPets.size == 1) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
@@ -496,7 +652,7 @@ fun HomeScreen(
                     quickLogCategory = null
                 },
                 onSaveStool = { stool, note ->
-                    val finalNote = "${stool.emoji} ${stool.label}${if (note.isNotBlank()) " • $note" else ""}"
+                    val finalNote = "${stool.label}${if (note.isNotBlank()) " • $note" else ""}"
 
                     vm.addLog(
                         petId = latestPet.id,
@@ -556,11 +712,11 @@ private fun PremiumSectionShell(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         color = colors.surface.copy(alpha = 0.98f),
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp,
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
         border = BorderStroke(
             1.dp,
-            colors.outlineVariant.copy(alpha = 0.22f)
+            colors.outlineVariant.copy(alpha = 0.20f)
         )
     ) {
         Column(
@@ -583,9 +739,9 @@ private fun DashboardOverviewCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
         color = colors.surface,
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp,
-        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.24f))
+        tonalElevation = 4.dp,
+        shadowElevation = 4.dp,
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
@@ -651,7 +807,7 @@ private fun CompactStatCard(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
         color = containerColor,
-        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.20f))
+        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.18f))
     ) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)) {
             Text(
@@ -730,7 +886,7 @@ private fun PremiumQuickActionCard(
     )
 
     val elevation by animateDpAsState(
-        targetValue = if (pressed) 1.dp else 4.dp,
+        targetValue = if (pressed) 1.dp else 5.dp,
         label = "quick_action_elevation"
     )
 
@@ -892,8 +1048,8 @@ private fun PetFilterChips(
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = selected == filter,
-                    borderColor = colors.outline,
-                    selectedBorderColor = colors.primary
+                    borderColor = colors.outlineVariant.copy(alpha = 0.55f),
+                    selectedBorderColor = colors.primary.copy(alpha = 0.55f)
                 )
             )
         }
@@ -928,7 +1084,7 @@ private fun PremiumPetCardContainer(
             containerColor = colors.surface
         ),
         elevation = CardDefaults.elevatedCardElevation(
-            defaultElevation = 2.dp,
+            defaultElevation = 3.dp,
             pressedElevation = 1.dp
         )
     ) {
@@ -1161,8 +1317,8 @@ private fun HomeEmptyStateCard(
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = colors.surface,
-        tonalElevation = 2.dp,
-        shadowElevation = 2.dp,
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
         border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     ) {
         Column(
@@ -1238,7 +1394,8 @@ private fun FullScreenPetProfile(
         state.logs
             .filter { it.petId == currentPet.id }
             .sortedWith(
-                compareByDescending<LogEntry> { it.date }
+                compareByDescending<LogEntry> { it.createdAtMillis }
+                    .thenByDescending { it.date }
                     .thenByDescending { it.id }
             )
     }
@@ -1302,8 +1459,8 @@ private fun FullScreenPetProfile(
                 Surface(
                     shape = RoundedCornerShape(26.dp),
                     color = colors.surface,
-                    tonalElevation = 2.dp,
-                    shadowElevation = 2.dp,
+                    tonalElevation = 3.dp,
+                    shadowElevation = 3.dp,
                     border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
                 ) {
                     Column {
@@ -1413,8 +1570,8 @@ private fun FullScreenPetProfile(
                 Surface(
                     shape = RoundedCornerShape(22.dp),
                     color = colors.surface,
-                    tonalElevation = 2.dp,
-                    shadowElevation = 2.dp,
+                    tonalElevation = 3.dp,
+                    shadowElevation = 3.dp,
                     border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
                 ) {
                     Column(
@@ -1440,6 +1597,7 @@ private fun FullScreenPetProfile(
                         Spacer(modifier = Modifier.height(14.dp))
 
                         QuickLogGrid(
+                            petSpecies = pet.species,
                             onAppetite = { onLogClick(ProfileQuickLogType.Appetite) },
                             onStool = { onLogClick(ProfileQuickLogType.Stool) },
                             onEnergy = { onLogClick(ProfileQuickLogType.Energy) },
@@ -1454,8 +1612,8 @@ private fun FullScreenPetProfile(
                 Surface(
                     shape = RoundedCornerShape(22.dp),
                     color = colors.surface,
-                    tonalElevation = 2.dp,
-                    shadowElevation = 2.dp,
+                    tonalElevation = 3.dp,
+                    shadowElevation = 3.dp,
                     border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -1491,9 +1649,8 @@ private fun FullScreenPetProfile(
                                     ) {
                                         PetLogCard(
                                             modifier = Modifier.fillMaxWidth(),
-                                            type = log.type.name.replace("_", " "),
-                                            note = log.note.ifBlank { "No details provided." },
-                                            dateText = log.date.toString(),
+                                            log = log,
+                                            petSpecies = currentPet.species,
                                             onEditClick = { onEditLog(log) }
                                         )
                                     }
@@ -1563,6 +1720,7 @@ private fun ProfileMetaChip(text: String) {
 
 @Composable
 private fun QuickLogGrid(
+    petSpecies: Species,
     onAppetite: () -> Unit,
     onStool: () -> Unit,
     onEnergy: () -> Unit,
@@ -1578,14 +1736,14 @@ private fun QuickLogGrid(
                 modifier = Modifier.weight(1f),
                 label = "Appetite",
                 subtitle = "Rate meal intake",
-                icon = Icons.Default.Restaurant,
+                iconRes = R.drawable.ic_appetite_normal,
                 onClick = onAppetite
             )
             QuickLogActionCard(
                 modifier = Modifier.weight(1f),
                 label = "Stool",
                 subtitle = "Track stool condition",
-                icon = Icons.Default.Description,
+                iconRes = R.drawable.ic_stool_normal,
                 onClick = onStool
             )
         }
@@ -1598,7 +1756,7 @@ private fun QuickLogGrid(
                 modifier = Modifier.weight(1f),
                 label = "Energy",
                 subtitle = "Mood and behavior",
-                icon = Icons.Default.Favorite,
+                iconRes = energyIconResForSpecies(petSpecies),
                 onClick = onEnergy
             )
             QuickLogActionCard(
@@ -1631,7 +1789,8 @@ private fun QuickLogActionCard(
     modifier: Modifier = Modifier,
     label: String,
     subtitle: String,
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    @DrawableRes iconRes: Int? = null,
     onClick: () -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -1639,7 +1798,7 @@ private fun QuickLogActionCard(
     val pressed by interactionSource.collectIsPressedAsState()
 
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.98f else 1f,
+        targetValue = if (pressed) 0.985f else 1f,
         animationSpec = tween(120),
         label = "quick_log_action_scale"
     )
@@ -1651,29 +1810,55 @@ private fun QuickLogActionCard(
             scaleX = scale
             scaleY = scale
         },
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(22.dp),
         color = colors.surfaceVariant,
         border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 14.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Surface(
-                shape = CircleShape,
-                color = colors.primary.copy(alpha = 0.14f)
+                shape = RoundedCornerShape(18.dp),
+                color = colors.surface.copy(alpha = 0.72f),
+                border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = colors.primary,
-                    modifier = Modifier.padding(10.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(110.dp)
+                        .padding(12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    when {
+                        iconRes != null -> {
+                            Image(
+                                painter = painterResource(id = iconRes),
+                                contentDescription = label,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
+
+                        icon != null -> {
+                            Icon(
+                                imageVector = icon,
+                                contentDescription = label,
+                                tint = colors.primary,
+                                modifier = Modifier.size(34.dp)
+                            )
+                        }
+                    }
+                }
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                horizontalAlignment = Alignment.Start
+            ) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.titleSmall,
@@ -1709,6 +1894,22 @@ private fun QuickLogChip(
         ),
         border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.22f))
     )
+}
+
+private fun formatLogDate(createdAtMillis: Long): String {
+    val dateTime = Instant.ofEpochMilli(createdAtMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDateTime()
+
+    return dateTime.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+}
+
+private fun formatLogTime(createdAtMillis: Long): String {
+    val dateTime = Instant.ofEpochMilli(createdAtMillis)
+        .atZone(ZoneId.systemDefault())
+        .toLocalDateTime()
+
+    return dateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1772,21 +1973,29 @@ private fun SwipeToDeleteLogCard(
 @Composable
 private fun PetLogCard(
     modifier: Modifier = Modifier,
-    type: String,
-    note: String,
-    dateText: String,
+    log: LogEntry,
+    petSpecies: Species,
     onEditClick: (() -> Unit)? = null
 ) {
     val colors = MaterialTheme.colorScheme
-    val logEmoji = when {
-        type.contains("Appetite", ignoreCase = true) -> "🍽️"
-        type.contains("Energy", ignoreCase = true) -> "💛"
-        type.contains("Weight", ignoreCase = true) -> "⚖️"
-        type.contains("Vaccine", ignoreCase = true) -> "💉"
-        type.contains("Deworm", ignoreCase = true) -> "🪱"
-        type.contains("Stool", ignoreCase = true) -> "💩"
-        type.contains("Notes", ignoreCase = true) -> "📝"
-        else -> "🐾"
+    val typeText = log.type.name.replace("_", " ")
+    val noteText = log.note.ifBlank { "No details provided." }
+
+    val logIconVector: ImageVector? = when (log.type) {
+        DataLogType.WEIGHT -> Icons.Default.ShowChart
+        DataLogType.VACCINE -> Icons.Default.Vaccines
+        DataLogType.DEWORM -> Icons.Default.Vaccines
+        else -> null
+    }
+
+    val logIconRes: Int? = when (log.type) {
+        DataLogType.APPETITE -> appetiteIconFromNote(log.note)
+        DataLogType.STOOL -> stoolIconFromNote(log.note)
+        DataLogType.ENERGY -> energyEmotionIconFromNote(
+            note = log.note,
+            species = petSpecies
+        )
+        else -> null
     }
 
     Surface(
@@ -1809,25 +2018,83 @@ private fun PetLogCard(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = logEmoji,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = colors.surface.copy(alpha = 0.72f),
+                        border = BorderStroke(1.dp, colors.outlineVariant.copy(alpha = 0.18f))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .padding(8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when {
+                                logIconRes != null -> {
+                                    Image(
+                                        painter = painterResource(id = logIconRes),
+                                        contentDescription = typeText,
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                                logIconVector != null -> {
+                                    Icon(
+                                        imageVector = logIconVector,
+                                        contentDescription = typeText,
+                                        tint = colors.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                else -> {
+                                    Icon(
+                                        imageVector = Icons.Default.Pets,
+                                        contentDescription = typeText,
+                                        tint = colors.primary,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = type,
+                            text = typeText,
                             style = MaterialTheme.typography.titleSmall,
                             color = colors.onSurface,
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = dateText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = colors.onSurfaceVariant
-                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(100.dp),
+                                color = colors.primary.copy(alpha = 0.10f)
+                            ) {
+                                Text(
+                                    text = formatLogTime(log.createdAtMillis),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = colors.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Text(
+                                text = formatLogDate(log.createdAtMillis),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = colors.onSurfaceVariant
+                            )
+                        }
                     }
                 }
 
@@ -1841,7 +2108,7 @@ private fun PetLogCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = note.ifBlank { "No details provided." },
+                text = noteText,
                 style = MaterialTheme.typography.bodyMedium,
                 color = colors.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth()
@@ -1873,7 +2140,7 @@ private fun EditLogDialog(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = log.date.toString(),
+                    text = "${formatLogDate(log.createdAtMillis)} • ${formatLogTime(log.createdAtMillis)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = colors.onSurfaceVariant
                 )
@@ -1982,60 +2249,17 @@ private fun QuickLogDialog(
 
                     QuickLogCategory.APPETITE -> {
                         Text(
-                            text = "Rate ${pet.name}'s appetite",
+                            text = "How was ${pet.name}'s appetite today?",
                             style = MaterialTheme.typography.bodyMedium,
                             color = colors.onSurfaceVariant
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        AppetiteLevel.entries.forEach { level ->
-                            Surface(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                color = if (selectedAppetite == level) {
-                                    colors.primary.copy(alpha = 0.12f)
-                                } else {
-                                    colors.surfaceVariant
-                                },
-                                border = BorderStroke(
-                                    1.dp,
-                                    if (selectedAppetite == level) colors.primary else colors.outlineVariant
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable { selectedAppetite = level }
-                                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    RadioButton(
-                                        selected = selectedAppetite == level,
-                                        onClick = { selectedAppetite = level },
-                                        colors = RadioButtonDefaults.colors(selectedColor = colors.primary)
-                                    )
-
-                                    Spacer(modifier = Modifier.width(8.dp))
-
-                                    Column {
-                                        Text(
-                                            text = level.label,
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = colors.onSurface,
-                                            fontWeight = FontWeight.Medium
-                                        )
-                                        Text(
-                                            text = "${level.score}/5",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = colors.onSurfaceVariant
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
+                        AppetiteSwipeSelector(
+                            selected = selectedAppetite,
+                            onSelected = { selectedAppetite = it }
+                        )
                     }
 
                     QuickLogCategory.STOOL -> {
@@ -2047,30 +2271,10 @@ private fun QuickLogDialog(
 
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            StoolLevel.entries.forEach { stool ->
-                                FilterChip(
-                                    selected = selectedStool == stool,
-                                    onClick = { selectedStool = stool },
-                                    label = { Text("${stool.emoji} ${stool.label}") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = colors.primary.copy(alpha = 0.14f),
-                                        selectedLabelColor = colors.primary,
-                                        containerColor = colors.surfaceVariant,
-                                        labelColor = colors.onSurfaceVariant
-                                    ),
-                                    border = FilterChipDefaults.filterChipBorder(
-                                        enabled = true,
-                                        selected = selectedStool == stool,
-                                        borderColor = colors.outlineVariant,
-                                        selectedBorderColor = colors.primary
-                                    )
-                                )
-                            }
-                        }
+                        StoolSwipeSelector(
+                            selected = selectedStool,
+                            onSelected = { selectedStool = it }
+                        )
                     }
 
                     QuickLogCategory.WEIGHT -> {
@@ -2199,6 +2403,349 @@ private fun QuickLogDialog(
             }
         }
     )
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun AppetiteSwipeSelector(
+    selected: AppetiteLevel,
+    onSelected: (AppetiteLevel) -> Unit
+) {
+    val levels = AppetiteLevel.entries
+    val initialPage = levels.indexOf(selected).coerceAtLeast(0)
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { levels.size }
+    )
+
+    LaunchedEffect(selected) {
+        val index = levels.indexOf(selected)
+        if (index >= 0 && pagerState.currentPage != index) {
+            pagerState.animateScrollToPage(index)
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val level = levels.getOrNull(pagerState.currentPage) ?: return@LaunchedEffect
+        if (level != selected) onSelected(level)
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 28.dp),
+            pageSpacing = 12.dp
+        ) { page ->
+            val level = levels[page]
+            val pageOffset = (
+                    (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                    ).absoluteValue
+
+            val scale = 0.90f + (1f - pageOffset.coerceIn(0f, 1f)) * 0.10f
+            val alpha = 0.62f + (1f - pageOffset.coerceIn(0f, 1f)) * 0.38f
+
+            AppetiteSwipeCard(
+                level = level,
+                selected = page == pagerState.currentPage,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        SwipePageIndicator(
+            pageCount = levels.size,
+            currentPage = pagerState.currentPage
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Swipe left or right to choose appetite level",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun StoolSwipeSelector(
+    selected: StoolLevel,
+    onSelected: (StoolLevel) -> Unit
+) {
+    val levels = StoolLevel.entries
+    val initialPage = levels.indexOf(selected).coerceAtLeast(0)
+    val pagerState = rememberPagerState(
+        initialPage = initialPage,
+        pageCount = { levels.size }
+    )
+
+    LaunchedEffect(selected) {
+        val index = levels.indexOf(selected)
+        if (index >= 0 && pagerState.currentPage != index) {
+            pagerState.animateScrollToPage(index)
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage) {
+        val level = levels.getOrNull(pagerState.currentPage) ?: return@LaunchedEffect
+        if (level != selected) onSelected(level)
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 28.dp),
+            pageSpacing = 12.dp
+        ) { page ->
+            val level = levels[page]
+            val pageOffset = (
+                    (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                    ).absoluteValue
+
+            val scale = 0.90f + (1f - pageOffset.coerceIn(0f, 1f)) * 0.10f
+            val alpha = 0.62f + (1f - pageOffset.coerceIn(0f, 1f)) * 0.38f
+
+            StoolSwipeCard(
+                level = level,
+                selected = page == pagerState.currentPage,
+                modifier = Modifier.graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        SwipePageIndicator(
+            pageCount = levels.size,
+            currentPage = pagerState.currentPage
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Swipe left or right to choose stool condition",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun AppetiteSwipeCard(
+    level: AppetiteLevel,
+    selected: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    val model = appetiteUiModel(level)
+    val accent = when (level) {
+        AppetiteLevel.VERY_POOR -> Color(0xFFE57373)
+        AppetiteLevel.LOW -> Color(0xFFFFB74D)
+        AppetiteLevel.NORMAL -> Color(0xFFFFD54F)
+        AppetiteLevel.GOOD -> Color(0xFF81C784)
+        AppetiteLevel.VERY_GOOD -> Color(0xFF4DB6AC)
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = accent.copy(alpha = if (selected) 0.13f else 0.09f),
+        border = BorderStroke(
+            width = if (selected) 1.4.dp else 1.dp,
+            color = accent.copy(alpha = if (selected) 0.48f else 0.28f)
+        ),
+        tonalElevation = if (selected) 4.dp else 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = colors.surface.copy(alpha = 0.72f),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = model.iconRes),
+                        contentDescription = model.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            SmallInfoBadge(text = "Appetite level")
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = model.title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = colors.onSurface,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = model.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Surface(
+                shape = RoundedCornerShape(100.dp),
+                color = accent.copy(alpha = 0.12f)
+            ) {
+                Text(
+                    text = "${level.score}/5",
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = accent.copy(alpha = 0.95f),
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StoolSwipeCard(
+    level: StoolLevel,
+    selected: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val colors = MaterialTheme.colorScheme
+    val model = stoolUiModel(level)
+    val accent = when (level) {
+        StoolLevel.NORMAL -> Color(0xFF81C784)
+        StoolLevel.SOFT -> Color(0xFFFFD54F)
+        StoolLevel.LOOSE -> Color(0xFFFFB74D)
+        StoolLevel.DIARRHEA -> Color(0xFFE57373)
+        StoolLevel.HARD -> Color(0xFF90A4AE)
+        StoolLevel.BLOOD_PRESENT -> Color(0xFFEF5350)
+        StoolLevel.MUCUS_PRESENT -> Color(0xFF4FC3F7)
+    }
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = accent.copy(alpha = if (selected) 0.13f else 0.09f),
+        border = BorderStroke(
+            width = if (selected) 1.4.dp else 1.dp,
+            color = accent.copy(alpha = if (selected) 0.48f else 0.28f)
+        ),
+        tonalElevation = if (selected) 4.dp else 0.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Surface(
+                shape = RoundedCornerShape(22.dp),
+                color = colors.surface.copy(alpha = 0.72f),
+                border = BorderStroke(1.dp, accent.copy(alpha = 0.30f))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = model.iconRes),
+                        contentDescription = model.title,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            SmallInfoBadge(text = "Stool condition")
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = model.title,
+                style = MaterialTheme.typography.headlineSmall,
+                color = colors.onSurface,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = model.subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun SwipePageIndicator(
+    pageCount: Int,
+    currentPage: Int
+) {
+    val colors = MaterialTheme.colorScheme
+
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        repeat(pageCount) { index ->
+            val selected = index == currentPage
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .size(
+                        width = if (selected) 18.dp else 8.dp,
+                        height = 8.dp
+                    )
+                    .clip(RoundedCornerShape(100.dp))
+                    .background(
+                        if (selected) colors.primary
+                        else colors.outline.copy(alpha = 0.30f)
+                    )
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
