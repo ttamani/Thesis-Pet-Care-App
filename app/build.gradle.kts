@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
+    kotlin("plugin.serialization") version "1.9.0"
 }
 
 android {
@@ -17,6 +18,8 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"AIzaSyBfz3RBC32PH77QrfjtSnrZ3tM0N-_yHZU\"")
+        buildConfigField("String", "SUPABASE_URL", "\"https://ienbjgclixkfbjkzfeoo.supabase.co\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"sb_publishable_TAEX6qwmeu2ly1M7bQu1kA_hk1o3_r2\"")
     }
 
     buildFeatures {
@@ -76,6 +79,14 @@ dependencies {
     implementation("com.google.android.gms:play-services-location:21.0.1")
 
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+
+    // Supabase client libraries
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.0.2"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.ktor:ktor-client-android:3.0.1")
+    implementation("io.ktor:ktor-client-content-negotiation:3.0.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.1")
+    implementation("io.ktor:ktor-client-logging:3.0.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

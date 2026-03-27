@@ -1,6 +1,7 @@
 package com.learning.multipet.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.learning.multipet.ai.GeminiRepository
 import com.learning.multipet.data.AppState
@@ -24,10 +25,14 @@ enum class ChatRole {
     AI
 }
 
-class AppViewModel(
-    private val repo: Repository = Repository(),
-    private val geminiRepository: GeminiRepository = GeminiRepository()
-) : ViewModel() {
+/**
+ * ViewModel that manages the application's core state, pets, logs, and AI chat functionality.
+ * Extends AndroidViewModel to properly work with the Android ViewModel factory system.
+ */
+class AppViewModel(app: Application) : AndroidViewModel(app) {
+
+    private val repo by lazy { Repository() }
+    private val geminiRepository by lazy { GeminiRepository() }
 
     val state: StateFlow<AppState> = repo.state
 

@@ -157,7 +157,7 @@ fun LoginScreen(
                             onCreateAccount = { email, pass ->
                                 sharedEmail = email
                                 onRegister(email, pass)
-                                mode = AuthMode.OtpVerify
+                                mode = AuthMode.Login
                             },
                             onGoogleSignIn = onGoogleSignIn,
                             onBackToLogin = { mode = AuthMode.Login }

@@ -1,6 +1,7 @@
 package com.learning.multipet
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.BorderStroke
@@ -64,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -79,6 +81,7 @@ import com.learning.multipet.ui.screens.PetViewMode
 import com.learning.multipet.ui.screens.VetMapScreen
 import com.learning.multipet.viewmodel.AppViewModel
 import com.learning.multipet.viewmodel.SessionViewModel
+import com.learning.multipet.viewmodel.ViewModelFactory
 import kotlinx.coroutines.delay
 
 enum class BottomTab(
@@ -136,12 +139,23 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppRoot(
-    vm: AppViewModel = viewModel(),
-    sessionVm: SessionViewModel = viewModel(),
+    vm: AppViewModel = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext as android.app.Application)),
+    sessionVm: SessionViewModel = viewModel(factory = ViewModelFactory(LocalContext.current.applicationContext as android.app.Application)),
     themeVm: ThemeViewModel = viewModel()
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val isLoggedIn = sessionVm.isLoggedIn.collectAsState().value
     val themePreference = themeVm.themePreference.collectAsState().value
+    val authError = sessionVm.authError.collectAsState().value
+    val isLoading = sessionVm.isLoading.collectAsState().value
+
+    // Show Toast for authentication errors
+    androidx.compose.runtime.LaunchedEffect(authError) {
+        authError?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            sessionVm.clearError()
+        }
+    }
 
     var launchState by rememberSaveable {
         mutableStateOf(
@@ -153,19 +167,27 @@ fun AppRoot(
         when (launchState) {
             LaunchState.LOGIN -> {
                 LoginScreen(
-                    onLogin = { _, _, _ ->
-                        sessionVm.saveSession("""{"mock":"session"}""")
-                        launchState = LaunchState.LOADING
+                    onLogin = { email, password, _ ->
+                        if (!isLoading) {
+                            sessionVm.signIn(email, password) {
+                                launchState = LaunchState.LOADING
+                            }
+                        }
                     },
-                    onRegister = { _, _ -> },
+                    onRegister = { email, password ->
+                        if (!isLoading) {
+                            sessionVm.signUp(email, password) {
+                                Toast.makeText(context, "Account created! Please log in.", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
                     onVerifyOtp = { _, _ ->
-                        sessionVm.saveSession("""{"mock":"session"}""")
+                        // OTP verification is not implemented - simple email/password only
                         launchState = LaunchState.LOADING
                     },
                     onGoogleSignIn = { },
                     onAuthSuccess = {
-                        sessionVm.saveSession("""{"mock":"session"}""")
-                        launchState = LaunchState.LOADING
+                        // Not used - authentication success handled via signIn/signUp callbacks
                     }
                 )
             }
