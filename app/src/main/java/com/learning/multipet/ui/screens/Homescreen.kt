@@ -13,6 +13,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -48,7 +49,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.GridView
@@ -409,7 +409,39 @@ fun HomeScreen(
     }
 
     val vaccinesDue = state.pets.count { !it.vaccinated }
-    val attentionNeeded = vaccinesDue
+
+    val attentionNeeded = remember(state.logs, state.pets) {
+        val recentLogs = state.logs.filter { entry ->
+            entry.date >= LocalDate.now().minusDays(7)
+        }
+
+        val flaggedLogsCount = recentLogs.count { entry ->
+            when (entry.type) {
+                DataLogType.APPETITE -> {
+                    entry.note.contains("very poor", ignoreCase = true) ||
+                            entry.note.contains("low", ignoreCase = true)
+                }
+                DataLogType.STOOL -> {
+                    entry.note.contains("diarrhea", ignoreCase = true) ||
+                            entry.note.contains("blood", ignoreCase = true) ||
+                            entry.note.contains("mucus", ignoreCase = true) ||
+                            entry.note.contains("loose", ignoreCase = true)
+                }
+                DataLogType.ENERGY -> {
+                    entry.note.contains("fear", ignoreCase = true) ||
+                            entry.note.contains("anxiety", ignoreCase = true) ||
+                            entry.note.contains("anger", ignoreCase = true)
+                }
+                else -> false
+            }
+        }
+
+        vaccinesDue + flaggedLogsCount
+    }
+
+    val recommendationState = remember(state.pets, state.logs) {
+        buildRecommendationHeroState(state.pets, state.logs)
+    }
 
     val filteredPets = remember(state.pets, selectedFilter) {
         when (selectedFilter) {
@@ -443,12 +475,30 @@ fun HomeScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+
+
                 item {
-                    DashboardOverviewCard(
+                    AccurateAiRecommendationHeroCard(
+                        state = recommendationState,
+                        onOpenRecommendation = onOpenAi,
+                        onOpenRecords = onOpenCalendar
+                    )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                item {
+                    SlimPetCareOverviewCard(
                         petCount = state.pets.size,
                         attentionNeeded = attentionNeeded,
                         dueVaccines = vaccinesDue
                     )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(12.dp))
                 }
 
                 item {
@@ -457,6 +507,10 @@ fun HomeScreen(
                         onFindVet = onFindVet,
                         onAiCare = onOpenAi
                     )
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
                 }
 
                 item {
@@ -856,14 +910,6 @@ private fun QuickActionsRow(
             label = "Find Vet",
             subtitle = "Nearby clinics",
             onClick = onFindVet
-        )
-
-        PremiumQuickActionCard(
-            modifier = Modifier.weight(1f),
-            icon = Icons.Default.AutoAwesome,
-            label = "FurSight AI",
-            subtitle = "Ask assistant",
-            onClick = onAiCare
         )
     }
 }

@@ -79,7 +79,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
@@ -386,38 +385,71 @@ private fun PremiumFocusCard(
                     onClear = onClear
                 )
 
-                Row(
-                    modifier = Modifier.padding(top = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val iconAlpha by animateFloatAsState(
-                        targetValue = 0.82f,
-                        animationSpec = tween(240),
-                        label = "focus_safety_alpha"
-                    )
+                Spacer(modifier = Modifier.height(12.dp))
 
-                    Icon(
-                        imageVector = Icons.Default.Shield,
-                        contentDescription = null,
-                        tint = colors.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(14.dp)
-                            .alpha(iconAlpha)
-                    )
-
-                    Spacer(modifier = Modifier.width(6.dp))
-
-                    Text(
-                        text = "General pet-care guidance only",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.onSurfaceVariant
-                    )
-                }
+                CompactSafetyNotice()
             }
         }
     }
 }
+@Composable
+private fun CompactSafetyNotice() {
+    val colors = MaterialTheme.colorScheme
 
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = colors.primary.copy(alpha = 0.06f),
+        border = BorderStroke(
+            1.dp,
+            colors.primary.copy(alpha = 0.14f)
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = colors.primary.copy(alpha = 0.12f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = colors.primary,
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(16.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Safety",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = colors.primary
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+
+                Text(
+                    text = "No diagnosis, no medication dosing, and no human medicine advice.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
 @Composable
 private fun WelcomeCard(
     selectedPets: List<Pet>
