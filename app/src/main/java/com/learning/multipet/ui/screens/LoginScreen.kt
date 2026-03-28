@@ -131,7 +131,7 @@ fun LoginScreen(
 
                 Text(
                     text = when (mode) {
-                        AuthMode.Login -> "Login to continue to MultiPet Care"
+                        AuthMode.Login -> "Login to continue to FurSight Dashboard"
                         AuthMode.Register -> "Register with your email to get started"
                         AuthMode.OtpVerify -> "Enter the 4-digit code sent to your email"
                     },

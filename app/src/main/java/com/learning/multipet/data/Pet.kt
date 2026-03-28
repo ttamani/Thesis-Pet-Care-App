@@ -3,24 +3,31 @@ package com.learning.multipet.data
 import java.time.LocalDate
 import java.util.UUID
 
-enum class Species { DOG, CAT }
-
+enum class Species {
+    DOG,
+    CAT
+}
 
 data class Pet(
-    val id: String = java.util.UUID.randomUUID().toString(),
+    val id: String = UUID.randomUUID().toString(),
     val species: Species = Species.DOG,
     val name: String = "",
     val breed: String = "",
     val sex: String = "Unknown",
-    val ageYears: Int = 1,
+    val birthDateMillis: Long = System.currentTimeMillis(),
     val weightKg: Double? = null,
     val vaccinated: Boolean = false,
     val imageUri: String? = null
 )
 
-
 enum class LogType {
-    APPETITE, STOOL, ENERGY, WEIGHT, VACCINE, DEWORM, NOTES
+    APPETITE,
+    STOOL,
+    ENERGY,
+    WEIGHT,
+    VACCINE,
+    DEWORM,
+    NOTES
 }
 
 data class LogEntry(

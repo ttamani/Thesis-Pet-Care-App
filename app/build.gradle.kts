@@ -1,8 +1,17 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     kotlin("plugin.serialization") version "1.9.0"
+}
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -17,7 +26,21 @@ android {
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("String", "GEMINI_API_KEY", "\"AIzaSyBfz3RBC32PH77QrfjtSnrZ3tM0N-_yHZU\"")
+        buildConfigField(
+            "String",
+            "PHI_API_KEY",
+            "\"${localProperties.getProperty("PHI_API_KEY", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "PHI_BASE_URL",
+            "\"${localProperties.getProperty("PHI_BASE_URL", "")}\""
+        )
+        buildConfigField(
+            "String",
+            "PHI_MODEL",
+            "\"${localProperties.getProperty("PHI_MODEL", "Phi-4-mini-instruct")}\""
+        )
         buildConfigField("String", "SUPABASE_URL", "\"https://ienbjgclixkfbjkzfeoo.supabase.co\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"sb_publishable_TAEX6qwmeu2ly1M7bQu1kA_hk1o3_r2\"")
     }
@@ -55,6 +78,9 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(libs.ui.text)
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 

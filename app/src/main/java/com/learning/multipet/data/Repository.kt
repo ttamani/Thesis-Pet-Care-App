@@ -13,14 +13,14 @@ data class AppState(
 )
 
 class Repository {
-    private val _state = MutableStateFlow(AppState())
+    private val _state: MutableStateFlow<AppState> = MutableStateFlow(AppState())
     val state: StateFlow<AppState> = _state
 
     fun addPet(pet: Pet) {
-        _state.update { s ->
-            val newPets = s.pets + pet
-            s.copy(
-                pets = newPets,
+        _state.update { currentState ->
+            val updatedPets: List<Pet> = currentState.pets + pet
+            currentState.copy(
+                pets = updatedPets,
                 selectedPetId = pet.id,
                 lastActivePetId = pet.id
             )
@@ -28,30 +28,52 @@ class Repository {
     }
 
     fun updatePet(pet: Pet) {
-        _state.update { s ->
-            val updated = s.pets.map { if (it.id == pet.id) pet else it }
-            s.copy(pets = updated, lastActivePetId = pet.id)
+        _state.update { currentState ->
+            val updatedPets: List<Pet> = currentState.pets.map { existingPet ->
+                if (existingPet.id == pet.id) {
+                    pet
+                } else {
+                    existingPet
+                }
+            }
+            currentState.copy(
+                pets = updatedPets,
+                selectedPetId = pet.id,
+                lastActivePetId = pet.id
+            )
         }
     }
 
     fun deletePet(petId: String) {
-        _state.update { s ->
-            val remaining = s.pets.filterNot { it.id == petId }
-            val newSelected = if (s.selectedPetId == petId) remaining.firstOrNull()?.id else s.selectedPetId
-            s.copy(
-                pets = remaining,
-                selectedPetId = newSelected,
-                lastActivePetId = newSelected
+        _state.update { currentState ->
+            val remainingPets: List<Pet> = currentState.pets.filterNot { it.id == petId }
+            val remainingLogs: List<LogEntry> = currentState.logs.filterNot { it.petId == petId }
+            val newSelectedPetId: String? = if (currentState.selectedPetId == petId) {
+                remainingPets.firstOrNull()?.id
+            } else {
+                currentState.selectedPetId
+            }
+
+            currentState.copy(
+                pets = remainingPets,
+                logs = remainingLogs,
+                selectedPetId = newSelectedPetId,
+                lastActivePetId = newSelectedPetId
             )
         }
     }
 
     fun selectPet(petId: String) {
-        _state.update { s -> s.copy(selectedPetId = petId, lastActivePetId = petId) }
+        _state.update { currentState ->
+            currentState.copy(
+                selectedPetId = petId,
+                lastActivePetId = petId
+            )
+        }
     }
 
     fun addLog(entry: LogEntry) {
-        val stampedEntry = entry.copy(
+        val stampedEntry: LogEntry = entry.copy(
             createdAtMillis = if (entry.createdAtMillis <= 0L) {
                 System.currentTimeMillis()
             } else {
@@ -59,19 +81,23 @@ class Repository {
             }
         )
 
-        _state.update { s ->
-            s.copy(
-                logs = s.logs + stampedEntry,
+        _state.update { currentState ->
+            currentState.copy(
+                logs = currentState.logs + stampedEntry,
                 lastActivePetId = stampedEntry.petId
             )
         }
     }
 
     fun updateLog(updatedLog: LogEntry) {
-        _state.update { s ->
-            s.copy(
-                logs = s.logs.map { existing ->
-                    if (existing.id == updatedLog.id) updatedLog else existing
+        _state.update { currentState ->
+            currentState.copy(
+                logs = currentState.logs.map { existingLog ->
+                    if (existingLog.id == updatedLog.id) {
+                        updatedLog
+                    } else {
+                        existingLog
+                    }
                 },
                 lastActivePetId = updatedLog.petId
             )
@@ -79,18 +105,17 @@ class Repository {
     }
 
     fun deleteLog(logId: String) {
-        _state.update { s ->
-            val logToDelete = s.logs.find { it.id == logId } ?: return@update s
+        _state.update { currentState ->
+            val logToDelete: LogEntry = currentState.logs.find { it.id == logId } ?: return@update currentState
+            val remainingLogs: List<LogEntry> = currentState.logs.filterNot { it.id == logId }
 
-            val remainingLogs = s.logs.filterNot { it.id == logId }
-
-            val updatedPets = s.pets.map { pet ->
+            val updatedPets: List<Pet> = currentState.pets.map { pet ->
                 if (pet.id != logToDelete.petId) {
                     pet
                 } else {
                     when (logToDelete.type) {
                         LogType.VACCINE -> {
-                            val stillHasVaccineLog = remainingLogs.any { entry ->
+                            val stillHasVaccineLog: Boolean = remainingLogs.any { entry ->
                                 entry.petId == pet.id && entry.type == LogType.VACCINE
                             }
                             pet.copy(vaccinated = stillHasVaccineLog)
@@ -100,7 +125,7 @@ class Repository {
                 }
             }
 
-            s.copy(
+            currentState.copy(
                 pets = updatedPets,
                 logs = remainingLogs,
                 lastActivePetId = logToDelete.petId
@@ -109,24 +134,32 @@ class Repository {
     }
 
     fun logsFor(date: LocalDate, petId: String?): List<LogEntry> {
-        val s = _state.value
-        return s.logs.filter { it.date == date && (petId == null || it.petId == petId) }
+        val currentState: AppState = _state.value
+        return currentState.logs.filter { entry ->
+            entry.date == date && (petId == null || entry.petId == petId)
+        }
     }
+
     fun upsertPet(pet: Pet) {
-        _state.update { s ->
-            val exists = s.pets.any { it.id == pet.id }
-            val newPets = if (exists) {
-                s.pets.map { if (it.id == pet.id) pet else it }
+        _state.update { currentState ->
+            val exists: Boolean = currentState.pets.any { it.id == pet.id }
+            val updatedPets: List<Pet> = if (exists) {
+                currentState.pets.map { existingPet ->
+                    if (existingPet.id == pet.id) {
+                        pet
+                    } else {
+                        existingPet
+                    }
+                }
             } else {
-                s.pets + pet
+                currentState.pets + pet
             }
 
-            s.copy(
-                pets = newPets,
+            currentState.copy(
+                pets = updatedPets,
                 selectedPetId = pet.id,
                 lastActivePetId = pet.id
             )
         }
     }
-
 }
