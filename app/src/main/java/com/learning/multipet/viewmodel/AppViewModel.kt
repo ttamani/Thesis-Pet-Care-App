@@ -2,6 +2,7 @@ package com.learning.multipet.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.learning.multipet.ai.PhiRepository
 import com.learning.multipet.data.AppState
@@ -25,10 +26,10 @@ enum class ChatRole {
     AI
 }
 
-class AppViewModel(
-    private val repo: Repository = Repository(),
+class AppViewModel(app: Application) : AndroidViewModel(app) {
+
+    private val repo: Repository = Repository()
     private val phiRepository: PhiRepository = PhiRepository()
-) : ViewModel() {
 
     val state: StateFlow<AppState> = repo.state
 

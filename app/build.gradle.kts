@@ -81,6 +81,7 @@ dependencies {
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation(libs.ui.text)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 
